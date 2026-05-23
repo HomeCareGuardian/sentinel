@@ -1,0 +1,11 @@
+version: "1"
+description: Expected hub state after black-box bootstrap (HTTP only)
+
+hub:
+  min_anomalies_after_seed: 1
+
+users:
+  email_env: E2E_USER_EMAIL
+
+homeassistant:
+  motion_entity_id: ""  # optional; set E2E_MOTION_ENTITY_ID in targets.env

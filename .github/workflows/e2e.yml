@@ -1,0 +1,139 @@
+name: Sentinel
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: Target profile(s) to run
+        type: choice
+        options:
+          - gcp
+          - local
+          - both
+        default: gcp
+
+concurrency:
+  group: sentinel-${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  resolve-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      profiles: ${{ steps.set.outputs.profiles }}
+    steps:
+      - id: set
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            case "${{ inputs.profile }}" in
+              both) echo 'profiles=["local","gcp"]' >> "$GITHUB_OUTPUT" ;;
+              local) echo 'profiles=["local"]' >> "$GITHUB_OUTPUT" ;;
+              *) echo 'profiles=["gcp"]' >> "$GITHUB_OUTPUT" ;;
+            esac
+          else
+            # PR/push: GCP by default; add local if org enables self-hosted / public local URLs
+            if [ "${{ vars.E2E_CI_LOCAL_ENABLED }}" = "true" ]; then
+              echo 'profiles=["local","gcp"]' >> "$GITHUB_OUTPUT"
+            else
+              echo 'profiles=["gcp"]' >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
+  e2e-pr-gate:
+    name: pr-gate (${{ matrix.profile }})
+    needs: resolve-matrix
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: ${{ fromJson(needs.resolve-matrix.outputs.profiles) }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Write profile config from secrets
+        env:
+          PROFILE: ${{ matrix.profile }}
+          GCP_HUB: ${{ secrets.E2E_GCP_HUB_BASE_URL }}
+          GCP_WEB: ${{ secrets.E2E_GCP_WEBSITE_BASE_URL }}
+          GCP_ADMIN_USER: ${{ secrets.E2E_GCP_ADMIN_USERNAME }}
+          GCP_ADMIN_PASS: ${{ secrets.E2E_GCP_ADMIN_PASSWORD }}
+          GCP_USER_EMAIL: ${{ secrets.E2E_GCP_USER_EMAIL }}
+          GCP_USER_PASS: ${{ secrets.E2E_GCP_USER_PASSWORD }}
+          LOCAL_HUB: ${{ secrets.E2E_LOCAL_HUB_BASE_URL }}
+          LOCAL_HUB_HOST: ${{ secrets.E2E_LOCAL_HUB_HOST }}
+          LOCAL_WEB: ${{ secrets.E2E_LOCAL_WEBSITE_BASE_URL }}
+          LOCAL_ADMIN_USER: ${{ secrets.E2E_LOCAL_ADMIN_USERNAME }}
+          LOCAL_ADMIN_PASS: ${{ secrets.E2E_LOCAL_ADMIN_PASSWORD }}
+          LOCAL_USER_EMAIL: ${{ secrets.E2E_LOCAL_USER_EMAIL }}
+          LOCAL_USER_PASS: ${{ secrets.E2E_LOCAL_USER_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ "${PROFILE}" = "gcp" ]; then
+            if [ -z "${GCP_HUB}" ] || [ -z "${GCP_WEB}" ]; then
+              echo "Skip: set E2E_GCP_HUB_BASE_URL and E2E_GCP_WEBSITE_BASE_URL secrets" >&2
+              exit 0
+            fi
+            cat > config/targets.gcp.env <<EOF
+          E2E_TARGET=gcp
+          E2E_TARGET_LABEL=GCP CI
+          HUB_BASE_URL=${GCP_HUB}
+          WEBSITE_BASE_URL=${GCP_WEB}
+          ADMIN_USERNAME=${GCP_ADMIN_USER}
+          ADMIN_PASSWORD=${GCP_ADMIN_PASS}
+          E2E_USER_EMAIL=${GCP_USER_EMAIL}
+          E2E_USER_PASSWORD=${GCP_USER_PASS}
+          E2E_HUB_READY_TIMEOUT=900
+          E2E_WEBSITE_READY_TIMEOUT=180
+          EOF
+          else
+            if { [ -z "${LOCAL_HUB}" ] && [ -z "${LOCAL_HUB_HOST}" ]; } || [ -z "${LOCAL_WEB}" ]; then
+              echo "Skip: set E2E_LOCAL_HUB_BASE_URL or E2E_LOCAL_HUB_HOST, and E2E_LOCAL_WEBSITE_BASE_URL" >&2
+              exit 0
+            fi
+            if [ -n "${LOCAL_HUB_HOST}" ]; then
+              HUB_LINE="HUB_HOST=${LOCAL_HUB_HOST}"
+            else
+              HUB_LINE="HUB_BASE_URL=${LOCAL_HUB}"
+            fi
+            cat > config/targets.local.env <<EOF
+          E2E_TARGET=local
+          E2E_TARGET_LABEL=Local CI
+          ${HUB_LINE}
+          WEBSITE_BASE_URL=${LOCAL_WEB}
+          ADMIN_USERNAME=${LOCAL_ADMIN_USER}
+          ADMIN_PASSWORD=${LOCAL_ADMIN_PASS}
+          E2E_USER_EMAIL=${LOCAL_USER_EMAIL}
+          E2E_USER_PASSWORD=${LOCAL_USER_PASS}
+          E2E_HUB_READY_TIMEOUT=300
+          E2E_WEBSITE_READY_TIMEOUT=120
+          EOF
+          fi
+
+      - name: Run P0 merge gate
+        run: |
+          pip install -e ".[dev]"
+          chmod +x bin/sentinel scripts/*.sh
+          ./bin/sentinel --${{ matrix.profile }} pr-gate
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-reports-${{ matrix.profile }}-${{ github.run_id }}
+          path: reports/${{ matrix.profile }}/
+          if-no-files-found: ignore

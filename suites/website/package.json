@@ -1,0 +1,11 @@
+{
+  "name": "sentinel-website",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "test:p0": "playwright test --grep @p0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0"
+  }
+}

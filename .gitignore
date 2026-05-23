@@ -1,0 +1,12 @@
+config/targets.env
+config/targets.local.env
+config/targets.gcp.env
+reports/
+.pytest_cache/
+__pycache__/
+*.pyc
+.venv/
+node_modules/
+suites/website/playwright-report/
+suites/website/test-results/
+config/targets.*.env

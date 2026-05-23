@@ -1,0 +1,29 @@
+# P0 hub paths used by iOS HCGAPIEndpoint + core app.py (E2E contract gate).
+version: "1"
+paths:
+  - method: GET
+    path: /health
+  - method: GET
+    path: /api/health
+  - method: GET
+    path: /api/status
+  - method: GET
+    path: /api/states
+  - method: GET
+    path: /api/entities
+  - method: GET
+    path: /api/anomalies
+  - method: POST
+    path: /api/anomalies
+  - method: POST
+    path: /api/anomalies/{anomaly_id}/acknowledge
+  - method: GET
+    path: /api/users/me
+  - method: POST
+    path: /api/auth/register
+  - method: GET
+    path: /api/dashboard
+  - method: GET
+    path: /api/devices
+  - method: GET
+    path: /api/ml/engine/state

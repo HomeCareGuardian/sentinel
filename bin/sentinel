@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+# Sentinel — black-box live regression for HomeCareGuardian.
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SENTINEL_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+cd "${SENTINEL_ROOT}"
+
+export E2E_TARGET="${E2E_TARGET:-local}"
+ARGS=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --local)  export E2E_TARGET=local; shift ;;
+    --gcp)    export E2E_TARGET=gcp; shift ;;
+    --target) export E2E_TARGET="${2:?--target requires local or gcp}"; shift 2 ;;
+    --hub-host)
+      export HUB_HOST="${2:?--hub-host requires a hostname (e.g. hcg-hub-5fcf7e73cfe7a329)}"
+      shift 2
+      ;;
+    *) ARGS+=("$1"); shift ;;
+  esac
+done
+set -- "${ARGS[@]}"
+
+# shellcheck source=/dev/null
+source "${SENTINEL_ROOT}/lib/common.sh"
+
+CMD="${1:-help}"
+shift || true
+
+case "${CMD}" in
+  check-targets) e2e_check_targets ;;
+  bootstrap)     e2e_bootstrap ;;
+  verify-bootstrap)
+    load_config
+    "${SENTINEL_ROOT}/scripts/verify-bootstrap.sh"
+    ;;
+  target|print-target) e2e_print_target ;;
+  pr-gate)       e2e_pr_gate ;;
+  pr-gate-hub)   e2e_pr_gate_hub ;;
+  pr-gate-hcg)   e2e_pr_gate_hub ;; # alias
+  all)           e2e_all ;;
+  contract)      e2e_contract ;;
+  website)       e2e_website "$@" ;;
+  ios)           e2e_ios ;;
+  journeys)      e2e_journeys "$@" ;;
+  up|down)
+    echo "Sentinel does not start product stacks." >&2
+    echo "  Provide live URLs in config/targets.<profile>.env" >&2
+    exit 1
+    ;;
+  help|-h|--help)
+    cat <<'EOF'
+Sentinel — black-box testing (github.com/HomeCareGuardian/sentinel)
+
+Usage: sentinel [--local | --gcp] <command>
+
+Profiles (config/targets.<profile>.env):
+  --local     Pi / LAN hub + local website URL
+  --gcp       GCP staging hub + website URLs
+
+Hub target (no fleet/hubs.yaml):
+  --hub-host NAME   e.g. hcg-hub-5fcf7e73cfe7a329 → http://NAME.local:8080
+  HUB_HOST=NAME     same; overrides HUB_BASE_URL host when set
+
+Commands:
+  target            Print active URLs and report directory
+  check-targets     Wait for HUB_BASE_URL + WEBSITE_BASE_URL
+  bootstrap         Seed hub via public HTTP APIs
+  verify-bootstrap  Assert bootstrap manifest on live hub
+  contract          Live OpenAPI vs endpoints manifest
+  journeys          Pytest hub journeys (--p0 | --p1)
+  website           Playwright (@p0 or --full)
+  ios               Hub HTTP P0 checklist
+  pr-gate           Full P0 merge gate (hub + website + ios)
+  pr-gate-hub       P0 hub-only gate
+  all               pr-gate + full website suite
+
+Examples:
+  sentinel --local --hub-host hcg-hub-5fcf7e73cfe7a329 pr-gate-hub
+  ./scripts/run-local.sh --host hcg-hub-5fcf7e73cfe7a329
+  sentinel --gcp pr-gate
+
+Config:
+  config/targets.local.env   (from targets.local.env.example)
+  config/targets.gcp.env     (from targets.gcp.env.example)
+  config/targets.env         optional overrides
+EOF
+    ;;
+  *)
+    echo "Unknown command: ${CMD}" >&2
+    exit 1
+    ;;
+esac
