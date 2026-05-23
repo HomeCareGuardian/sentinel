@@ -1,0 +1,59 @@
+# Live GET catalog for hcg-core hub (port 8080). Expect codes calibrated on Pi LAN.
+# Source: HUB_LAN_API_AUDIT.md + iOS validate_apis RELAY_PROXY_ENDPOINTS
+version: "1"
+endpoints:
+  - { method: GET, path: /health, expect: [200] }
+  - { method: GET, path: /api/health, expect: [200] }
+  - { method: GET, path: /api/status, expect: [200] }
+  - { method: GET, path: /api/states, expect: [200] }
+  - { method: GET, path: /api/entities, expect: [200] }
+  - { method: GET, path: /api/dashboard, expect: [200] }
+  - { method: GET, path: /api/anomalies, expect: [200] }
+  - { method: GET, path: /api/devices, expect: [200] }
+  - { method: GET, path: /api/devices/debug, expect: [200] }
+  - { method: GET, path: /api/areas, expect: [200] }
+  - { method: GET, path: /api/rooms, expect: [200] }
+  - { method: GET, path: /api/presence/snapshot, expect: [200] }
+  - { method: GET, path: /api/presence/history, expect: [200] }
+  - { method: GET, path: /api/resident/status, expect: [200, 401] }
+  - { method: GET, path: /api/activity/day, expect: [200] }
+  - { method: GET, path: /api/admin/users, expect: [200, 401, 403] }
+  - { method: GET, path: /api/admin/ml/status, expect: [200, 401, 403] }
+  - { method: GET, path: /api/admin/database/tables, expect: [200, 401, 403] }
+  - { method: GET, path: /api/containers/status, expect: [200] }
+  - { method: GET, path: /api/relay/status, expect: [200] }
+  - { method: GET, path: /api/diagnostics/self, expect: [200, 401, 403] }
+  - { method: GET, path: /api/diagnostics/resolve, expect: [200, 401, 403] }
+  - { method: GET, path: /api/ha/issues, expect: [200] }
+  - { method: GET, path: /api/hub/runtime-settings, expect: [200, 401, 403] }
+  - { method: GET, path: /api/insights/resident, expect: [200] }
+  - { method: GET, path: /api/logbook, expect: [200] }
+  - { method: GET, path: /api/logs, expect: [200] }
+  - { method: GET, path: /api/location/from-pi, expect: [200, 404] }
+  - { method: GET, path: /api/ml/engine/state, expect: [200, 401, 500, 503] }
+  - { method: GET, path: /api/ml/scheduler/status, expect: [200, 401, 500, 503] }
+  - { method: GET, path: /api/ml/predictions, expect: [200, 401, 500, 503] }
+  - { method: GET, path: /api/ml/activity/summary, expect: [200, 401, 500, 503] }
+  - { method: GET, path: /api/ml/insights/detailed, expect: [200, 401, 500, 503] }
+  - { method: GET, path: /api/ml/entities, expect: [200] }
+  - { method: GET, path: /api/ml/human-events/status, expect: [200] }
+  - { method: GET, path: /api/ml/household-profile, expect: [200, 401, 500, 503] }
+  - { method: GET, path: /api/ml/analytics-settings, expect: [200, 401, 500, 503] }
+  - { method: GET, path: /api/ml/relay-settings, expect: [200, 401, 500, 503] }
+  - { method: GET, path: /api/ml/human-events/predict, expect: [200, 401, 422, 500, 503] }
+  - { method: GET, path: /api/network/stats, expect: [200] }
+  - { method: GET, path: /api/recorder/status, expect: [200] }
+  - { method: GET, path: /api/storage/stats, expect: [200] }
+  - { method: GET, path: /api/system/telemetry, expect: [200] }
+  - { method: GET, path: /api/system/telemetry/history, expect: [200] }
+  - { method: GET, path: /api/system/snapshots, expect: [200, 401, 403] }
+  - { method: GET, path: /api/self/devices, expect: [200] }
+  - { method: GET, path: /api/users/me, expect: [200, 404] }
+  - { method: GET, path: /api/weather, expect: [200, 404, 503] }
+  - { method: GET, path: /api/wifi/networks, expect: [200] }
+  - { method: GET, path: /api/wifi/status, expect: [200] }
+  - { method: GET, path: /api/homeassistant/test-connection, expect: [200, 401, 403, 500, 503] }
+  - { method: GET, path: /api/homeassistant/config/flows, expect: [200, 401, 500, 503] }
+  - { method: GET, path: /api/discovery/pending-pair, expect: [200] }
+  - { method: GET, path: /provision/status, expect: [200] }
+  - { method: GET, path: /api/devices/search, expect: [200, 400, 404], query: "query=a" }

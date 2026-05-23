@@ -84,7 +84,7 @@ e2e_journeys() {
 
   local marker="sentinel_e2e"
   if [[ "${tier}" == "p0" ]]; then
-    marker="sentinel_e2e and (j1 or j2 or j3 or j4)"
+    marker="sentinel_e2e and (j1 or j2 or j3 or j4 or api_catalog)"
   fi
 
   cd "${SENTINEL_ROOT}"

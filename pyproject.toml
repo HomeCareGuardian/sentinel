@@ -36,6 +36,7 @@ markers = [
     "j2: Journey J2 — caregiver auth",
     "j3: Journey J3 — HA states via hub API",
     "j4: Journey J4 — anomaly lifecycle",
+    "api_catalog: Full hub GET API catalog smoke",
 ]
 addopts = "-v --strict-markers --tb=short"
 timeout = 120

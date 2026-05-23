@@ -39,6 +39,8 @@ def test_anomaly_create_list_acknowledge(hub_client, motion_entity_id: str, admi
         json={"acknowledged_by": "e2e-j4"},
         **ack_kwargs,
     )
+    if ack.status_code == 500 and "Admin authentication not configured" in ack.text:
+        pytest.skip("hub ADMIN_USERNAME/ADMIN_PASSWORD not set on Pi")
     assert ack.status_code in (200, 201), ack.text
     ack_body = ack.json()
     assert ack_body.get("acknowledged_at") or ack_body.get("anomaly_id") == anomaly_id
