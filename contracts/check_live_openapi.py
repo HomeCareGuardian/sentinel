@@ -49,17 +49,21 @@ def _bootstrap_caregiver(client: httpx.Client, hub: str) -> None:
     email = os.environ.get("E2E_USER_EMAIL", "e2e-caregiver@homecareguardian.test")
     password = os.environ.get("E2E_USER_PASSWORD", "ChangeMeE2e123!")
     name = os.environ.get("E2E_USER_NAME", "E2E Caregiver")
-    client.post(
-        f"{hub}/api/auth/register",
-        json={
-            "name": name,
-            "email": email,
-            "password": password,
-            "birth_year": 1950,
-            "pronoun": "they",
-            "postcode": "SW1A 1AA",
-        },
-    )
+    payload = {
+        "name": name,
+        "email": email,
+        "password": password,
+        "birth_year": 1950,
+        "pronoun": "they",
+        "postcode": "SW1A 1AA",
+    }
+    for attempt in range(3):
+        try:
+            client.post(f"{hub}/api/auth/register", json=payload)
+            return
+        except httpx.HTTPError:
+            if attempt == 2:
+                raise
 
 
 def _check_http_probe(client: httpx.Client, hub: str, paths: list[dict]) -> bool:
