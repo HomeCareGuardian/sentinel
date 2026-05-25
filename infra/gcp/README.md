@@ -65,7 +65,7 @@ In `HomeCareGuardian/sentinel` repository settings, add environment **`gcp`** or
 | `E2E_GCP_USER_EMAIL` | |
 | `E2E_GCP_USER_PASSWORD` | |
 
-The workflow job `hub-e2e-gcp` maps these automatically (see `.github/workflows/e2e.yml`).
+The workflow job `pr-gate (gcp)` maps these automatically (see `.github/workflows/e2e.yml` and `docs/CI_SECRETS.md`).
 
 ## Ephemeral VMs (optional)
 

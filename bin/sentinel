@@ -43,6 +43,7 @@ case "${CMD}" in
   contract)      e2e_contract ;;
   website)       e2e_website "$@" ;;
   ios)           e2e_ios ;;
+  ios-xcuitest)  e2e_ios_xcuitest ;;
   journeys)      e2e_journeys "$@" ;;
   up|down)
     echo "Sentinel does not start product stacks." >&2
@@ -72,6 +73,7 @@ Commands:
   journeys          Pytest hub journeys (--p0 | --p1)
   website           Playwright (@p0 or --full)
   ios               Hub HTTP P0 checklist
+  ios-xcuitest      XCUITest phase 2 (macOS; XCUITEST_ENABLED=1)
   pr-gate           Full P0 merge gate (hub + website + ios)
   pr-gate-hub       P0 hub-only gate
   all               pr-gate + full website suite

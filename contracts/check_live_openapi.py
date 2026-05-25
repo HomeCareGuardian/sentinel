@@ -100,10 +100,18 @@ def main() -> int:
         print("FAIL: HUB_BASE_URL required", file=sys.stderr)
         return 1
 
+    strict = os.environ.get("STRICT_OPENAPI", "").strip() in ("1", "true", "yes")
     paths = _manifest_paths()
     with httpx.Client(timeout=20.0) as client:
-        if _check_openapi(client, hub, paths):
+        openapi_ok = _check_openapi(client, hub, paths)
+        if openapi_ok:
             return 0
+        if strict:
+            print(
+                f"FAIL: STRICT_OPENAPI=1 but GET {hub}/openapi.json is not valid",
+                file=sys.stderr,
+            )
+            return 1
         print(
             f"WARN: GET {hub}/openapi.json unavailable; falling back to HTTP probe",
             file=sys.stderr,

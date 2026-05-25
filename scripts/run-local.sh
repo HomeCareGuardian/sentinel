@@ -3,6 +3,8 @@
 #
 #   ./scripts/run-local.sh --host hcg-hub-5fcf7e73cfe7a329
 #   HUB_HOST=hcg-hub-5fcf7e73cfe7a329 ./scripts/run-local.sh
+#
+# Full guide: docs/run-local.md
 set -euo pipefail
 
 SENTINEL_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -82,6 +84,22 @@ grep -vE '^(HUB_HOST|HUB_BASE_URL|PI_HOST|HUB_DEVICE_ID)=' "${TARGETS_FILE}" > "
 rm -f "${TARGETS_FILE}.tmp"
 
 export HUB_HOST HUB_BASE_URL PI_HOST HUB_DEVICE_ID
+
+# shellcheck disable=SC1090
+set -a
+source "${TARGETS_FILE}"
+set +a
+
+if [[ -z "${ADMIN_USERNAME:-}" || -z "${ADMIN_PASSWORD:-}" ]]; then
+  echo "FAIL: set ADMIN_USERNAME and ADMIN_PASSWORD in ${TARGETS_FILE}" >&2
+  echo "      Copy from ~/hcg-core/.env on the Pi (see docs/run-local.md)" >&2
+  exit 1
+fi
+if [[ "${ADMIN_PASSWORD}" == "change_me" ]]; then
+  echo "FAIL: ADMIN_PASSWORD is still the example placeholder in ${TARGETS_FILE}" >&2
+  echo "      Use the value from ~/hcg-core/.env on the Pi" >&2
+  exit 1
+fi
 
 if [[ ! -x "${SENTINEL_ROOT}/.venv/bin/pytest" ]]; then
   python3 -m venv "${SENTINEL_ROOT}/.venv"

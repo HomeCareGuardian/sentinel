@@ -86,8 +86,9 @@ jobs:
           set -euo pipefail
           if [ "${PROFILE}" = "gcp" ]; then
             if [ -z "${GCP_HUB}" ] || [ -z "${GCP_WEB}" ]; then
-              echo "Skip: set E2E_GCP_HUB_BASE_URL and E2E_GCP_WEBSITE_BASE_URL secrets" >&2
-              exit 0
+              echo "FAIL: set E2E_GCP_HUB_BASE_URL and E2E_GCP_WEBSITE_BASE_URL in repo secrets" >&2
+              echo "See docs/CI_SECRETS.md and infra/gcp/README.md" >&2
+              exit 1
             fi
             cat > config/targets.gcp.env <<EOF
           E2E_TARGET=gcp
@@ -103,8 +104,9 @@ jobs:
           EOF
           else
             if { [ -z "${LOCAL_HUB}" ] && [ -z "${LOCAL_HUB_HOST}" ]; } || [ -z "${LOCAL_WEB}" ]; then
-              echo "Skip: set E2E_LOCAL_HUB_BASE_URL or E2E_LOCAL_HUB_HOST, and E2E_LOCAL_WEBSITE_BASE_URL" >&2
-              exit 0
+              echo "FAIL: set E2E_LOCAL_HUB_BASE_URL or E2E_LOCAL_HUB_HOST, and E2E_LOCAL_WEBSITE_BASE_URL" >&2
+              echo "See docs/CI_SECRETS.md" >&2
+              exit 1
             fi
             if [ -n "${LOCAL_HUB_HOST}" ]; then
               HUB_LINE="HUB_HOST=${LOCAL_HUB_HOST}"

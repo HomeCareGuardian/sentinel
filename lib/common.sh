@@ -115,10 +115,23 @@ e2e_website() {
   npm ci --prefer-offline 2>/dev/null || npm install
   npx playwright install chromium 2>/dev/null || true
   if [[ "${mode}" == "p0" ]]; then
-    WEBSITE_BASE_URL="${WEBSITE_BASE_URL}" npx playwright test --grep @p0
+    E2E_TARGET="${E2E_TARGET}" E2E_REPORTS_DIR="${E2E_REPORTS_DIR}" \
+      WEBSITE_BASE_URL="${WEBSITE_BASE_URL}" npx playwright test --grep @p0
   else
-    WEBSITE_BASE_URL="${WEBSITE_BASE_URL}" npx playwright test
+    E2E_TARGET="${E2E_TARGET}" E2E_REPORTS_DIR="${E2E_REPORTS_DIR}" \
+      WEBSITE_BASE_URL="${WEBSITE_BASE_URL}" npx playwright test
   fi
+}
+
+e2e_ios_xcuitest() {
+  load_config
+  mkdir -p "${E2E_REPORTS_DIR}"
+  export E2E_TARGET E2E_REPORTS_DIR HUB_BASE_URL
+  if [[ "${XCUITEST_ENABLED:-}" != "1" ]]; then
+    echo "SKIP: XCUITest phase 2 (set XCUITEST_ENABLED=1 and HCG_IOS_APP_PATH)" >&2
+    return 0
+  fi
+  bash "${SENTINEL_ROOT}/suites/ios/run_xcuitest.sh"
 }
 
 e2e_ios() {
