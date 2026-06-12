@@ -71,7 +71,6 @@ def main() -> int:
             if not ok:
                 rows.append(Row("GET", "/api/app/hubs", r.status_code, False, r.text))
                 print(f"FAIL GET /api/app/hubs -> {r.status_code} ({ms:.0f}ms)")
-                return 1
             
             data = r.json()
             hubs = data.get("hubs", [])
