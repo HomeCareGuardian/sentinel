@@ -34,12 +34,12 @@ def main() -> int:
 
     with httpx.Client(base_url=relay_url, timeout=20.0) as client:
         # 1. Login
-        start = time.time()
+        start = time.perf_counter()
         try:
             r = client.post("/api/app/login", json={"email": email, "password": password})
             ok = r.status_code == 200
             rows.append(Row("POST", "/api/app/login", r.status_code, ok))
-            ms = (time.time() - start) * 1000
+            ms = (time.perf_counter() - start) * 1000
             mark = "OK" if ok else "FAIL"
             print(f"{mark} POST /api/app/login -> {r.status_code} ({ms:.0f}ms)")
             
