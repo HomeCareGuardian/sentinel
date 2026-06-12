@@ -63,10 +63,10 @@ def main() -> int:
                 return 1
                 
             # 2. Get /api/app/hubs
-            start = time.time()
+            start = time.perf_counter()
             r = client.get("/api/app/hubs", headers={"Authorization": f"Bearer {token}"})
             ok = r.status_code == 200
-            ms = (time.time() - start) * 1000
+            ms = (time.perf_counter() - start) * 1000
             
             if not ok:
                 rows.append(Row("GET", "/api/app/hubs", r.status_code, False, r.text))
