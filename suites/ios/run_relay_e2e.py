@@ -45,52 +45,66 @@ def main() -> int:
             
             if not ok:
                 print(f"FAIL: Login returned {r.status_code}: {r.text}", file=sys.stderr)
-                return 1
-                
-            try:
-                login_data = r.json()
-            except Exception as exc:
-                print(f"FAIL: Login response is not valid JSON: {exc}", file=sys.stderr)
-                return 1
+                # Appended to rows above, we skip the rest if login fails
+                login_data = {}
+            else:
+                try:
+                    login_data = r.json()
+                except Exception as exc:
+                    print(f"FAIL: Login response is not valid JSON: {exc}", file=sys.stderr)
+                    login_data = {}
+                    rows[-1].ok = False
+                    rows[-1].error = "Invalid JSON"
 
             if not isinstance(login_data, dict):
                 print(f"FAIL: Login response is not a JSON object: {login_data}", file=sys.stderr)
-                return 1
+                login_data = {}
+                rows[-1].ok = False
 
             token = login_data.get("token")
             if not token:
                 print("FAIL: No token in login response", file=sys.stderr)
-                return 1
+                rows[-1].ok = False
                 
             # 2. Get /api/app/hubs
-            start = time.perf_counter()
-            r = client.get("/api/app/hubs", headers={"Authorization": f"Bearer {token}"})
-            ok = r.status_code == 200
-            ms = (time.perf_counter() - start) * 1000
-            
-            if not ok:
-                rows.append(Row("GET", "/api/app/hubs", r.status_code, False, r.text))
-                print(f"FAIL GET /api/app/hubs -> {r.status_code} ({ms:.0f}ms)")
-            
-            data = r.json()
-            hubs = data.get("hubs", [])
-            
-            if not hubs:
-                print(f"WARN GET /api/app/hubs -> {r.status_code} ({ms:.0f}ms) (0 hubs returned, cannot assert shape)")
-                rows.append(Row("GET", "/api/app/hubs", r.status_code, True))
-            else:
-                hub = hubs[0]
-                if "role" not in hub or "permissions" not in hub:
-                    print(f"FAIL GET /api/app/hubs -> {r.status_code} ({ms:.0f}ms) (Missing role or permissions in hub payload)")
-                    print(f"Payload: {hub}", file=sys.stderr)
-                    rows.append(Row("GET", "/api/app/hubs", r.status_code, False, "Missing role or permissions"))
+            if token:
+                start = time.perf_counter()
+                r = client.get("/api/app/hubs", headers={"Authorization": f"Bearer {token}"})
+                ok = r.status_code == 200
+                ms = (time.perf_counter() - start) * 1000
+                
+                if not ok:
+                    rows.append(Row("GET", "/api/app/hubs", r.status_code, False, r.text))
+                    print(f"FAIL GET /api/app/hubs -> {r.status_code} ({ms:.0f}ms)")
                 else:
-                    print(f"OK GET /api/app/hubs -> {r.status_code} ({ms:.0f}ms) (Shape validated)")
-                    rows.append(Row("GET", "/api/app/hubs", r.status_code, True))
+                    try:
+                        data = r.json()
+                        if not isinstance(data, dict):
+                            raise ValueError("Response is not a JSON object")
+                    except Exception as exc:
+                        print(f"FAIL: Hubs response is not valid JSON: {exc}", file=sys.stderr)
+                        rows.append(Row("GET", "/api/app/hubs", r.status_code, False, "Invalid JSON response"))
+                        data = {}
+
+                    if data:
+                        hubs = data.get("hubs", [])
+                        
+                        if not hubs:
+                            print(f"WARN GET /api/app/hubs -> {r.status_code} ({ms:.0f}ms) (0 hubs returned, cannot assert shape)")
+                            rows.append(Row("GET", "/api/app/hubs", r.status_code, True))
+                        else:
+                            hub = hubs[0]
+                            if "role" not in hub or "permissions" not in hub:
+                                print(f"FAIL GET /api/app/hubs -> {r.status_code} ({ms:.0f}ms) (Missing role or permissions in hub payload)")
+                                print(f"Payload: {hub}", file=sys.stderr)
+                                rows.append(Row("GET", "/api/app/hubs", r.status_code, False, "Missing role or permissions"))
+                            else:
+                                print(f"OK GET /api/app/hubs -> {r.status_code} ({ms:.0f}ms) (Shape validated)")
+                                rows.append(Row("GET", "/api/app/hubs", r.status_code, True))
                     
         except Exception as exc:
             print(f"FAIL Relay request -> {exc}", file=sys.stderr)
-            return 1
+            rows.append(Row("Unknown", "Relay", None, False, str(exc)))
 
     failed = [x for x in rows if not x.ok]
     if failed:

@@ -70,6 +70,7 @@ jobs:
         env:
           PROFILE: ${{ matrix.profile }}
           GCP_HUB: ${{ secrets.E2E_GCP_HUB_BASE_URL }}
+          GCP_RELAY: ${{ secrets.E2E_GCP_RELAY_BASE_URL }}
           GCP_WEB: ${{ secrets.E2E_GCP_WEBSITE_BASE_URL }}
           GCP_ADMIN_USER: ${{ secrets.E2E_GCP_ADMIN_USERNAME }}
           GCP_ADMIN_PASS: ${{ secrets.E2E_GCP_ADMIN_PASSWORD }}
@@ -77,6 +78,7 @@ jobs:
           GCP_USER_PASS: ${{ secrets.E2E_GCP_USER_PASSWORD }}
           LOCAL_HUB: ${{ secrets.E2E_LOCAL_HUB_BASE_URL }}
           LOCAL_HUB_HOST: ${{ secrets.E2E_LOCAL_HUB_HOST }}
+          LOCAL_RELAY: ${{ secrets.E2E_LOCAL_RELAY_BASE_URL }}
           LOCAL_WEB: ${{ secrets.E2E_LOCAL_WEBSITE_BASE_URL }}
           LOCAL_ADMIN_USER: ${{ secrets.E2E_LOCAL_ADMIN_USERNAME }}
           LOCAL_ADMIN_PASS: ${{ secrets.E2E_LOCAL_ADMIN_PASSWORD }}
@@ -94,6 +96,7 @@ jobs:
           E2E_TARGET=gcp
           E2E_TARGET_LABEL=GCP CI
           HUB_BASE_URL=${GCP_HUB}
+          RELAY_BASE_URL=${GCP_RELAY}
           WEBSITE_BASE_URL=${GCP_WEB}
           ADMIN_USERNAME=${GCP_ADMIN_USER}
           ADMIN_PASSWORD=${GCP_ADMIN_PASS}
@@ -117,6 +120,7 @@ jobs:
           E2E_TARGET=local
           E2E_TARGET_LABEL=Local CI
           ${HUB_LINE}
+          RELAY_BASE_URL=${LOCAL_RELAY}
           WEBSITE_BASE_URL=${LOCAL_WEB}
           ADMIN_USERNAME=${LOCAL_ADMIN_USER}
           ADMIN_PASSWORD=${LOCAL_ADMIN_PASS}
