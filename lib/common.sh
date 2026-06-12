@@ -138,7 +138,7 @@ e2e_ios() {
   load_config
   export HUB_BASE_URL RELAY_BASE_URL E2E_USER_EMAIL E2E_USER_PASSWORD
   cd "${SENTINEL_ROOT}"
-  python3 suites/ios/run_hub_e2e.py
+  python3 suites/ios/run_hub_e2e.py && \
   python3 suites/ios/run_relay_e2e.py
 }
 
