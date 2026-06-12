@@ -47,7 +47,17 @@ def main() -> int:
                 print(f"FAIL: Login returned {r.status_code}: {r.text}", file=sys.stderr)
                 return 1
                 
-            token = r.json().get("token")
+            try:
+                login_data = r.json()
+            except Exception as exc:
+                print(f"FAIL: Login response is not valid JSON: {exc}", file=sys.stderr)
+                return 1
+
+            if not isinstance(login_data, dict):
+                print(f"FAIL: Login response is not a JSON object: {login_data}", file=sys.stderr)
+                return 1
+
+            token = login_data.get("token")
             if not token:
                 print("FAIL: No token in login response", file=sys.stderr)
                 return 1
