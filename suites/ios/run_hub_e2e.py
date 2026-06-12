@@ -33,14 +33,65 @@ class Row:
 
 
 def main() -> int:
-    hub = os.environ.get("HUB_BASE_URL", "").strip()
-    if not hub:
-        print("FAIL: HUB_BASE_URL is required for iOS hub E2E", file=sys.stderr)
-        return 1
-    hub = hub.rstrip("/")
+    hub = os.environ.get("HUB_BASE_URL", "").strip().rstrip("/")
+    relay_url = os.environ.get("RELAY_BASE_URL", "").strip().rstrip("/")
+    email = os.environ.get("E2E_USER_EMAIL", "").strip()
+    password = os.environ.get("E2E_USER_PASSWORD", "").strip()
+
+    if relay_url and email and password:
+        # Use relay proxy approach
+        print(
+            f"INFO: RELAY_BASE_URL is set, routing hub E2E tests through relay proxy at {relay_url}"
+        )
+        try:
+            with httpx.Client(base_url=relay_url, timeout=10.0) as auth_client:
+                r_auth = auth_client.post(
+                    "/api/app/login", json={"email": email, "password": password}
+                )
+                if r_auth.status_code != 200:
+                    print(
+                        f"FAIL: Relay login failed -> {r_auth.status_code}: {r_auth.text}",
+                        file=sys.stderr,
+                    )
+                    return 1
+                token = r_auth.json().get("token")
+
+                r_hubs = auth_client.get(
+                    "/api/app/hubs", headers={"Authorization": f"Bearer {token}"}
+                )
+                if r_hubs.status_code != 200:
+                    print(
+                        f"FAIL: Relay get hubs failed -> {r_hubs.status_code}: {r_hubs.text}",
+                        file=sys.stderr,
+                    )
+                    return 1
+
+                hubs = r_hubs.json().get("hubs", [])
+                if not hubs:
+                    print("FAIL: No hubs found for user in relay", file=sys.stderr)
+                    return 1
+
+                device_id = hubs[0].get("device_id")
+
+            hub = f"{relay_url}/api/hubs/{device_id}/proxy"
+            headers = {"Authorization": f"Bearer {token}"}
+            print(f"INFO: Authenticated and resolved proxy path for hub {device_id}")
+        except Exception as exc:
+            print(f"FAIL: Relay auth setup failed -> {exc}", file=sys.stderr)
+            return 1
+    else:
+        # Fallback to direct hub connection
+        if not hub:
+            print(
+                "FAIL: HUB_BASE_URL or (RELAY_BASE_URL + E2E_USER credentials) is required for iOS hub E2E",
+                file=sys.stderr,
+            )
+            return 1
+        headers = {}
+        print(f"INFO: No relay config found. Falling back to direct hub URL: {hub}")
 
     rows: list[Row] = []
-    with httpx.Client(base_url=hub, timeout=20.0) as client:
+    with httpx.Client(base_url=hub, headers=headers, timeout=20.0) as client:
         for method, path, expected in P0_ENDPOINTS:
             start = time.time()
             try:
