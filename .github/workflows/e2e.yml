@@ -3,6 +3,11 @@ name: Sentinel
 on:
   pull_request:
     branches: [main]
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
   push:
     branches: [main]
   workflow_dispatch:
@@ -46,6 +51,7 @@ jobs:
             fi
           fi
 
+    if: github.event.pull_request.draft == false || github.event_name != 'pull_request'
   e2e-pr-gate:
     name: pr-gate (${{ matrix.profile }})
     needs: resolve-matrix
@@ -139,3 +145,4 @@ jobs:
           name: e2e-reports-${{ matrix.profile }}-${{ github.run_id }}
           path: reports/${{ matrix.profile }}/
           if-no-files-found: ignore
+    if: github.event.pull_request.draft == false || github.event_name != 'pull_request'
