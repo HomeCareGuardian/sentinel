@@ -5,8 +5,13 @@ from __future__ import annotations
 
 import os
 import sys
+from pathlib import Path
 
 import httpx
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from lib.hub_transport import make_hub_client  # noqa: E402
 
 MOTION_ENTITY = os.environ.get("E2E_MOTION_ENTITY_ID", "")
 
@@ -23,7 +28,7 @@ def main() -> int:
     admin_user = os.environ.get("ADMIN_USERNAME", "")
     admin_pass = os.environ.get("ADMIN_PASSWORD", "")
 
-    with httpx.Client(base_url=hub, timeout=30.0) as client:
+    with make_hub_client() as client:
         reg = client.post(
             "/api/auth/register",
             json={
@@ -71,7 +76,9 @@ def main() -> int:
             ack_kwargs["headers"] = {"Authorization": "Bearer admin"}
 
         ack = client.post(f"/api/anomalies/{anomaly_id}/acknowledge", **ack_kwargs)
-        if ack.status_code not in (200, 201):
+        if ack.status_code == 500:
+            print("WARN: acknowledge 500 — body-parse crash on hub (hcg#2505)", file=sys.stderr)
+        elif ack.status_code not in (200, 201):
             print(f"WARN: acknowledge {ack.status_code} (check ADMIN_* credentials)", file=sys.stderr)
         else:
             print(f"OK: acknowledged {anomaly_id}")

@@ -84,7 +84,7 @@ e2e_journeys() {
 
   local marker="sentinel_e2e"
   if [[ "${tier}" == "p0" ]]; then
-    marker="sentinel_e2e and (j1 or j2 or j3 or j4 or api_catalog)"
+    marker="sentinel_e2e and (j0 or j1 or j2 or j3 or j4 or j7 or api_catalog)"
   fi
 
   cd "${SENTINEL_ROOT}"
@@ -102,6 +102,7 @@ e2e_contract() {
   load_config
   cd "${SENTINEL_ROOT}"
   python3 contracts/check_live_openapi.py
+  python3 contracts/check_ios_manifest.py
 }
 
 e2e_website() {
@@ -154,8 +155,8 @@ e2e_pr_gate_hub() {
   e2e_journeys --p0
   e2e_ios
 
-  E2E_REPORTS_DIR="${E2E_REPORTS_DIR}" python3 "${SENTINEL_ROOT}/scripts/merge_junit.py" 2>/dev/null || true
-  E2E_REPORTS_DIR="${E2E_REPORTS_DIR}" python3 "${SENTINEL_ROOT}/scripts/failure_summary.py" 2>/dev/null || true
+  E2E_REPORTS_DIR="${E2E_REPORTS_DIR}" python3 "${SENTINEL_ROOT}/scripts/merge_junit.py" || true
+  E2E_REPORTS_DIR="${E2E_REPORTS_DIR}" python3 "${SENTINEL_ROOT}/scripts/failure_summary.py" || true
   echo "==> pr-gate-hub complete (${E2E_TARGET})"
 }
 
@@ -171,8 +172,8 @@ e2e_pr_gate() {
   e2e_website
   e2e_ios
 
-  E2E_REPORTS_DIR="${E2E_REPORTS_DIR}" python3 "${SENTINEL_ROOT}/scripts/merge_junit.py" 2>/dev/null || true
-  E2E_REPORTS_DIR="${E2E_REPORTS_DIR}" python3 "${SENTINEL_ROOT}/scripts/failure_summary.py" 2>/dev/null || true
+  E2E_REPORTS_DIR="${E2E_REPORTS_DIR}" python3 "${SENTINEL_ROOT}/scripts/merge_junit.py" || true
+  E2E_REPORTS_DIR="${E2E_REPORTS_DIR}" python3 "${SENTINEL_ROOT}/scripts/failure_summary.py" || true
   echo "==> pr-gate complete (${E2E_TARGET})"
 }
 

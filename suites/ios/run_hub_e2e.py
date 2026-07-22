@@ -7,8 +7,13 @@ import os
 import sys
 import time
 from dataclasses import dataclass
+from pathlib import Path
 
 import httpx
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from lib.hub_transport import make_hub_client  # noqa: E402
 
 # P0 subset aligned with journeys/catalog.yaml and iOS HCGAPIEndpoint
 P0_ENDPOINTS: list[tuple[str, str, tuple[int, ...]]] = [
@@ -90,8 +95,13 @@ def main() -> int:
         headers = {}
         print(f"INFO: No relay config found. Falling back to direct hub URL: {hub}")
 
+    if headers:
+        client_cm = httpx.Client(base_url=hub, headers=headers, timeout=20.0)
+    else:
+        client_cm = make_hub_client(timeout=20.0, base_url=hub)
+
     rows: list[Row] = []
-    with httpx.Client(base_url=hub, headers=headers, timeout=20.0) as client:
+    with client_cm as client:
         for method, path, expected in P0_ENDPOINTS:
             start = time.time()
             try:

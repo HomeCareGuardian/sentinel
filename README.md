@@ -27,6 +27,17 @@ See **[docs/run-local.md](docs/run-local.md)** for prerequisites, tunnels, and t
 
 `HUB_HOST` without a dot becomes `http://<host>.local:8080` (mDNS).
 
+## Hubs past setup mode (LAN gate)
+
+Production hubs refuse direct-LAN API calls with 403 `production_lan_refused`
+(hcg#640/#2333); only loopback callers (the relay path) are served, and hub
+sshd hardening blocks `ssh -L` tunnels. Sentinel handles this transparently:
+when the gate is detected (and `PI_HOST`/`HUB_HOST` gives it SSH access), every
+request runs as `ssh pi@<hub> curl http://127.0.0.1:8080/...` over a persisted
+SSH connection (`lib/hub_transport.py`). Force a mode with
+`HUB_TRANSPORT=direct|ssh-exec|auto`. The gate itself is regression-tested by
+journey J0.
+
 ## Profiles
 
 | Profile | Use when | Config |
@@ -43,7 +54,7 @@ Optional `config/targets.env` overrides either profile.
 | `target` | Print active URLs and report dir |
 | `check-targets` | Wait for hub + website |
 | `bootstrap` | Seed hub via public HTTP |
-| `contract` | Manifest vs live OpenAPI |
+| `contract` | Manifest vs live OpenAPI + iOS endpoint drift check |
 | `journeys` | Pytest P0/P1 (`--p0`, `--p1`) |
 | `website` | Playwright `@p0` (or `--full`) |
 | `ios` | Hub HTTP P0 checklist |
@@ -70,3 +81,7 @@ Optional `config/targets.env` overrides either profile.
 
 - Live HTTP/UI only — no mocks, no checkout of `hcg`, `Website`, or `iOS-App` in default CI.
 - You provide deployed URLs; Sentinel probes them.
+- **500 is never a pass.** Any 500 fails the gate — that is the point of the gate.
+- Red is information: known-red tests reference their product ticket in the
+  assertion message (currently hcg#2505 body-parse crashes, hcg#2506 device
+  config). They stay red until the hub fix ships; do not loosen the expectation.
