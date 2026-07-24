@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
+import uuid
+
 import pytest
 
 pytestmark = [pytest.mark.sentinel_e2e, pytest.mark.j5]
-
-ROOM_ID = "e2e-sentinel-room"
-ROOM_NAME = "E2E Sentinel Room"
 
 
 def _room_ids(payload) -> set[str]:
@@ -20,11 +19,15 @@ def _room_ids(payload) -> set[str]:
 def test_room_create_list_delete(hub_client, admin_auth):
     if admin_auth is None:
         pytest.skip("ADMIN_USERNAME/ADMIN_PASSWORD not set")
+    # Unique per run so shared-hub / parallel-worker runs never collide on a
+    # leftover room id from a prior aborted run.
+    room_id = f"e2e-sentinel-room-{uuid.uuid4()}"
+    room_name = "E2E Sentinel Room"
     created_ok = False
     try:
         created = hub_client.post(
             "/api/rooms",
-            json={"room_id": ROOM_ID, "name": ROOM_NAME},
+            json={"room_id": room_id, "name": room_name},
             auth=admin_auth,
         )
         if created.status_code == 503:
@@ -34,16 +37,16 @@ def test_room_create_list_delete(hub_client, admin_auth):
 
         listed = hub_client.get("/api/rooms")
         assert listed.status_code == 200
-        assert ROOM_ID in _room_ids(listed.json()), "created room missing from /api/rooms"
+        assert room_id in _room_ids(listed.json()), "created room missing from /api/rooms"
 
         # Happy-path delete: only here do we assert the delete succeeded.
-        deleted = hub_client.delete(f"/api/rooms/{ROOM_ID}", auth=admin_auth)
+        deleted = hub_client.delete(f"/api/rooms/{room_id}", auth=admin_auth)
         assert deleted.status_code == 200, deleted.text[:300]
         created_ok = False
 
         listed = hub_client.get("/api/rooms")
         assert listed.status_code == 200
-        assert ROOM_ID not in _room_ids(listed.json()), "room still listed after delete"
+        assert room_id not in _room_ids(listed.json()), "room still listed after delete"
     finally:
         # Best-effort cleanup only when a create actually landed and the
         # happy-path delete did not already run. Never hard-assert here: a
@@ -51,6 +54,6 @@ def test_room_create_list_delete(hub_client, admin_auth):
         # 404 from deleting a room that was never made.
         if created_ok:
             try:
-                hub_client.delete(f"/api/rooms/{ROOM_ID}", auth=admin_auth)
+                hub_client.delete(f"/api/rooms/{room_id}", auth=admin_auth)
             except Exception:
                 pass
