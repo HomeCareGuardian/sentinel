@@ -80,11 +80,15 @@ cmd_up() {
   if [[ "${1:-}" == "simulator" ]]; then
     with_sim=1
   fi
-  # Start HA side first so bootstrap can obtain HA_TOKEN before hub comes up.
-  "${COMPOSE[@]}" up -d postgres homeassistant
   if [[ ! -f "${ENV_FILE}" ]]; then
     cp "${ROOT}/config/targets.virtual-hub.env.example" "${ENV_FILE}"
   fi
+  # Recorder URL in ha-config/secrets.yaml must match POSTGRES_PASSWORD before HA starts.
+  python3 "${ROOT}/virtual_hub/bootstrap_ha.py" \
+    --env-file "${ENV_FILE}" \
+    --sync-secrets-only
+  # Start HA side first so bootstrap can obtain HA_TOKEN before hub comes up.
+  "${COMPOSE[@]}" up -d postgres homeassistant
   python3 "${ROOT}/virtual_hub/bootstrap_ha.py" \
     --ha-url "${HA_BASE_URL}" \
     --env-file "${ENV_FILE}" \
@@ -142,6 +146,9 @@ cmd_wait_healthy() {
 }
 
 cmd_bootstrap_ha() {
+  python3 "${ROOT}/virtual_hub/bootstrap_ha.py" \
+    --env-file "${ENV_FILE}" \
+    --sync-secrets-only
   python3 "${ROOT}/virtual_hub/bootstrap_ha.py" \
     --ha-url "${HA_BASE_URL}" \
     --env-file "${ENV_FILE}" \
@@ -201,13 +208,12 @@ cmd_run_scenario() {
   fi
   "${COMPOSE[@]}" run --rm \
     -e SCENARIO="${name}" \
-    -e ACCELERATED=1 \
-    -e LOOP_DAYS=0 \
+    -e VCH_SIM_MODE=once \
+    -e VCH_ACCELERATED=1 \
     -e HA_TOKEN="${HA_TOKEN:-}" \
     -e HA_BASE_URL=http://homeassistant:8123 \
-    --entrypoint python \
     day-simulator \
-    day_runner.py --once --scenario "${name}" --accelerated
+    --mode once --scenario "${name}" --accelerated
 }
 
 main() {

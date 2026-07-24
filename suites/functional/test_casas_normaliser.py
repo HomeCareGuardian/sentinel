@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
 import pytest
 
-ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "virtual_hub" / "simulator"))
-
-from casas_normaliser import event_to_ha_payload, normalise_scenario_events  # noqa: E402
+from virtual_hub.simulator.casas_normaliser import (
+    classify_sensor,
+    event_to_ha_payload,
+    normalise_scenario_events,
+)
 
 pytestmark = [pytest.mark.functional]
 
@@ -20,6 +18,10 @@ def test_casas_motion_shorthand():
     assert payload["entity_id"].startswith("binary_sensor.vch_")
     assert payload["state"] == "on"
     assert payload["offset_seconds"] == 5
+    domain, device_class, entity_id = classify_sensor("M001")
+    assert domain == "binary_sensor"
+    assert device_class == "motion"
+    assert entity_id == payload["entity_id"]
 
 
 def test_explicit_entity_passthrough():

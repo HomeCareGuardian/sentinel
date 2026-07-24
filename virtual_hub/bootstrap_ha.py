@@ -12,10 +12,13 @@ import json
 import os
 import sys
 import time
+import urllib.parse
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
+
+import websocket
 
 DEFAULT_USER = "vch_admin"
 DEFAULT_PASSWORD = "vch_ha_change_me"
@@ -52,17 +55,40 @@ def _http(
         raise RuntimeError(f"HA unreachable at {url}: {exc}") from exc
 
 
+def _env_get(env_file: Path, key: str, default: str = "") -> str:
+    if env_file.is_file():
+        for line in env_file.read_text(encoding="utf-8").splitlines():
+            if line.startswith(f"{key}="):
+                return line.split("=", 1)[1].strip()
+    return os.environ.get(key, default)
+
+
+def sync_ha_secrets(env_file: Path, secrets_path: Path | None = None) -> Path:
+    """Write HA secrets.yaml recorder URL from twin env (single source of truth)."""
+    secrets_path = secrets_path or (
+        Path(__file__).resolve().parent / "ha-config" / "secrets.yaml"
+    )
+    postgres_password = _env_get(env_file, "POSTGRES_PASSWORD", "vch_postgres_password")
+    postgres_db = _env_get(env_file, "POSTGRES_DB", "homeassistant")
+    postgres_user = _env_get(env_file, "POSTGRES_USER", "homeassistant")
+    recorder_url = (
+        f"postgresql://{postgres_user}:{postgres_password}"
+        f"@postgres:5432/{postgres_db}"
+    )
+    secrets_path.parent.mkdir(parents=True, exist_ok=True)
+    secrets_path.write_text(f"recorder_db_url: {recorder_url}\n", encoding="utf-8")
+    return secrets_path
+
+
 def wait_for_ha(base: str, timeout: int = 180) -> None:
     start = time.time()
     while time.time() - start < timeout:
         try:
             status, _ = _http("GET", f"{base}/api/", timeout=5)
-            # 401 means HA is up but needs auth; 200 with onboarding similarly.
             if status in (200, 401):
                 return
         except RuntimeError:
             pass
-        # Onboarding endpoint is available before full API auth.
         try:
             status, _ = _http("GET", f"{base}/api/onboarding", timeout=5)
             if status == 200:
@@ -76,10 +102,8 @@ def wait_for_ha(base: str, timeout: int = 180) -> None:
 def onboarding_done(base: str) -> bool:
     status, payload = _http("GET", f"{base}/api/onboarding")
     if status != 200:
-        # Already past onboarding: endpoint often 401 once configured.
         return status == 401
     if isinstance(payload, list):
-        # Empty list or all steps done.
         return len(payload) == 0 or all(
             isinstance(x, dict) and x.get("done") for x in payload
         )
@@ -91,7 +115,6 @@ def onboarding_done(base: str) -> bool:
 
 
 def complete_onboarding(base: str, username: str, password: str) -> str | None:
-    """Create owner user. Returns refresh/access token if present in response."""
     status, payload = _http(
         "POST",
         f"{base}/api/onboarding/users",
@@ -104,7 +127,6 @@ def complete_onboarding(base: str, username: str, password: str) -> str | None:
         },
     )
     if status not in (200, 201):
-        # May already be completed.
         print(f"onboarding users: HTTP {status} {payload}", file=sys.stderr)
         return None
     if isinstance(payload, dict):
@@ -115,18 +137,7 @@ def complete_onboarding(base: str, username: str, password: str) -> str | None:
 
 
 def login_token(base: str, username: str, password: str) -> str:
-    """Obtain a short-lived token via the token endpoint (password grant)."""
-    # HA auth token endpoint expects form body for password grant.
-    import urllib.parse
-
-    form = urllib.parse.urlencode(
-        {
-            "grant_type": "password",
-            "client_id": f"{base}/",
-            "username": username,
-            "password": password,
-        }
-    ).encode("utf-8")
+    """Obtain a short-lived access token via HA login_flow + auth code exchange."""
     req = Request(
         f"{base}/auth/login_flow",
         data=json.dumps(
@@ -197,16 +208,6 @@ def login_token(base: str, username: str, password: str) -> str:
 
 def create_long_lived_token(base: str, access_token: str, name: str) -> str:
     """Create LLAT via WebSocket auth API (REST has no public LLAT create)."""
-    try:
-        import websocket  # type: ignore
-    except ImportError:
-        # Fallback: reuse short-lived access token for twin (restart refreshes via bootstrap).
-        print(
-            "websocket-client not installed; using session access token as HA_TOKEN",
-            file=sys.stderr,
-        )
-        return access_token
-
     ws_url = base.replace("http://", "ws://").replace("https://", "wss://") + "/api/websocket"
     ws = websocket.create_connection(ws_url, timeout=20)
     try:
@@ -281,10 +282,21 @@ def main() -> int:
     parser.add_argument("--username", default=os.environ.get("HA_USERNAME", DEFAULT_USER))
     parser.add_argument("--password", default=os.environ.get("HA_PASSWORD", DEFAULT_PASSWORD))
     parser.add_argument("--write-token", action="store_true")
+    parser.add_argument(
+        "--sync-secrets-only",
+        action="store_true",
+        help="Only sync ha-config/secrets.yaml from env (no HA API calls)",
+    )
     args = parser.parse_args()
 
     base = args.ha_url.rstrip("/")
     env_path = Path(args.env_file)
+
+    secrets_path = sync_ha_secrets(env_path)
+    print(f"Synced HA secrets to {secrets_path}")
+
+    if args.sync_secrets_only:
+        return 0
 
     wait_for_ha(base)
 
@@ -301,7 +313,6 @@ def main() -> int:
     if not onboarding_done(base):
         print("Completing HA onboarding...")
         complete_onboarding(base, args.username, args.password)
-        # Finish remaining onboarding steps best-effort (core config / integration).
         for step in ("core_config", "analytics", "integration"):
             _http("POST", f"{base}/api/onboarding/{step}", body={})
 

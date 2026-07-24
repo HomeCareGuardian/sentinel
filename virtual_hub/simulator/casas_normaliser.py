@@ -5,6 +5,17 @@ from __future__ import annotations
 from typing import Any, Iterable
 
 
+def classify_sensor(sensor: str) -> tuple[str, str, str]:
+    """Return (domain, device_class, entity_id) for a CASAS-style sensor code."""
+    key = sensor.upper()
+    slug = sensor.lower()
+    if key.startswith("M") or "MOTION" in key:
+        return "binary_sensor", "motion", f"binary_sensor.vch_{slug}_motion"
+    if key.startswith("D") or "DOOR" in key:
+        return "binary_sensor", "door", f"binary_sensor.vch_{slug}_door"
+    return "sensor", "occupancy", f"sensor.vch_{slug}"
+
+
 def event_to_ha_payload(event: dict[str, Any]) -> dict[str, Any]:
     """Map one scenario event to HA set_state arguments.
 
@@ -25,12 +36,12 @@ def event_to_ha_payload(event: dict[str, Any]) -> dict[str, Any]:
     if not sensor or not value:
         raise ValueError(f"unrecognised event shape: {event!r}")
 
-    entity_id = casas_sensor_to_entity(sensor)
+    _domain, device_class, entity_id = classify_sensor(sensor)
     state = normalise_binary_state(value)
     attrs = {
         "friendly_name": sensor,
         "source": "sentinel-vch",
-        "device_class": guess_device_class(sensor),
+        "device_class": device_class,
     }
     return {
         "entity_id": entity_id,
@@ -40,15 +51,6 @@ def event_to_ha_payload(event: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def casas_sensor_to_entity(sensor: str) -> str:
-    key = sensor.upper()
-    if key.startswith("M") or "MOTION" in key:
-        return f"binary_sensor.vch_{sensor.lower()}_motion"
-    if key.startswith("D") or "DOOR" in key:
-        return f"binary_sensor.vch_{sensor.lower()}_door"
-    return f"sensor.vch_{sensor.lower()}"
-
-
 def normalise_binary_state(value: str) -> str:
     v = value.strip().upper()
     if v in {"ON", "OPEN", "TRUE", "1", "PRESENT", "DETECTED"}:
@@ -56,15 +58,6 @@ def normalise_binary_state(value: str) -> str:
     if v in {"OFF", "CLOSE", "CLOSED", "FALSE", "0", "ABSENT", "CLEAR"}:
         return "off"
     return value.lower()
-
-
-def guess_device_class(sensor: str) -> str:
-    key = sensor.upper()
-    if key.startswith("M") or "MOTION" in key:
-        return "motion"
-    if key.startswith("D") or "DOOR" in key:
-        return "door"
-    return "occupancy"
 
 
 def normalise_scenario_events(events: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:

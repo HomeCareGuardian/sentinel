@@ -11,10 +11,12 @@ import pytest
 pytestmark = [pytest.mark.functional, pytest.mark.requires_virtual_hub]
 
 
-@pytest.fixture(scope="module", autouse=True)
-def _skip_unless_hub_up(hub_base_url: str) -> None:
+@pytest.fixture(autouse=True)
+def _require_hub_healthy(hub_base_url: str, request: pytest.FixtureRequest) -> None:
+    if request.node.get_closest_marker("requires_virtual_hub") is None:
+        return
     try:
-        with httpx.Client(base_url=hub_base_url, timeout=3.0) as client:
+        with httpx.Client(base_url=hub_base_url, timeout=5.0) as client:
             r = client.get("/health")
             if r.status_code != 200:
                 pytest.skip(f"virtual hub not healthy at {hub_base_url}")
@@ -34,6 +36,40 @@ def _entity_ids(payload: Any) -> set[str]:
             return _entity_ids(payload["states"])
         return {k for k in payload if isinstance(k, str) and "." in k}
     return set()
+
+
+def _enforce_scenario_entities(
+    *,
+    ids: set[str],
+    must_ids: list[str],
+    must_sub: list[str],
+    scenario: str,
+) -> None:
+    """Fail closed on missing scenario entities unless explicitly allowed to skip."""
+    missing = [e for e in must_ids if e not in ids]
+    sub_ok = not must_sub or any(any(s in eid for s in must_sub) for eid in ids)
+    if not missing and sub_ok:
+        return
+    allow_skip = os.environ.get("VCH_ALLOW_MISSING_SCENARIO") == "1"
+    require = os.environ.get("VCH_REQUIRE_SCENARIO") == "1"
+    if allow_skip and not require:
+        pytest.skip(
+            f"scenario {scenario!r} entities not present (VCH_ALLOW_MISSING_SCENARIO=1); "
+            "run: ./scripts/virtual-hub.sh run-scenario "
+            f"{scenario}"
+        )
+    if missing:
+        assert not missing, (
+            f"scenario {scenario!r} missing entities {missing}; "
+            "run: ./scripts/virtual-hub.sh run-scenario "
+            f"{scenario}"
+        )
+    if must_sub and not sub_ok:
+        assert sub_ok, (
+            f"scenario {scenario!r}: no /api/states entity matches {must_sub}; "
+            "run: ./scripts/virtual-hub.sh run-scenario "
+            f"{scenario}"
+        )
 
 
 def test_health_matches_oracle(hub_client, oracle, hub_version):
@@ -85,16 +121,10 @@ def test_states_after_idle_or_motion(hub_client, oracle):
     after = (spec.get("after_scenario") or {}).get(scenario) or {}
     must_ids = after.get("must_include_entity_ids") or []
     must_sub = after.get("must_include_entity_substrings") or []
-    if must_ids:
-        missing = [e for e in must_ids if e not in ids]
-        if missing:
-            pytest.skip(
-                f"scenario entities not present yet ({missing}); "
-                "run: ./scripts/virtual-hub.sh run-scenario idle_home"
-            )
-    if must_sub:
-        if not any(any(s in eid for s in must_sub) for eid in ids):
-            pytest.skip(
-                f"no entity matching {must_sub}; "
-                "run: ./scripts/virtual-hub.sh run-scenario single_day_motion"
-            )
+    if must_ids or must_sub:
+        _enforce_scenario_entities(
+            ids=ids,
+            must_ids=must_ids,
+            must_sub=must_sub,
+            scenario=scenario,
+        )

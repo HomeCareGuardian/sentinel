@@ -39,8 +39,22 @@ cp config/targets.virtual-hub.env.example config/targets.virtual-hub.env
 Optional continuous simulator:
 
 ```bash
-./scripts/virtual-hub.sh up simulator
+VCH_SIM_MODE=continuous ./scripts/virtual-hub.sh up simulator
 ```
+
+### Day-runner modes
+
+The simulator (`virtual_hub/simulator/day_runner.py`) supports three modes via
+`--mode` or `VCH_SIM_MODE`:
+
+| Mode | Behaviour |
+|------|-----------|
+| `once` | Replay scenario once and exit (used by `run-scenario`) |
+| `repeat` | Replay `--repeat N` times (`VCH_SIM_REPEAT`, default 1) |
+| `continuous` | Loop forever; sleeps until next day boundary between runs |
+
+`run-scenario` uses `--mode once --accelerated`. The `up simulator` profile sets
+`VCH_SIM_MODE=continuous` in compose.
 
 Override with `VCH_COMPOSE="docker compose"` only if you need a non-default path.
 ## How sensor inject works

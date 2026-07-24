@@ -106,8 +106,9 @@ services:
       HA_BASE_URL: http://homeassistant:8123
       HA_TOKEN: ${HA_TOKEN:-}
       SCENARIO: ${VCH_SCENARIO:-idle_home}
-      ACCELERATED: ${VCH_ACCELERATED:-0}
-      LOOP_DAYS: ${VCH_LOOP_DAYS:-1}
+      VCH_SIM_MODE: ${VCH_SIM_MODE:-continuous}
+      VCH_SIM_REPEAT: ${VCH_SIM_REPEAT:-1}
+      VCH_ACCELERATED: ${VCH_ACCELERATED:-0}
     volumes:
       - ./virtual_hub/simulator/scenarios:/scenarios:ro
     networks:
