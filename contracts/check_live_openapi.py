@@ -11,6 +11,9 @@ import httpx
 import yaml
 
 SENTINEL_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(SENTINEL_ROOT))
+
+from lib.hub_transport import make_hub_client  # noqa: E402
 
 
 def _manifest_paths() -> list[dict]:
@@ -102,7 +105,7 @@ def main() -> int:
 
     strict = os.environ.get("STRICT_OPENAPI", "").strip() in ("1", "true", "yes")
     paths = _manifest_paths()
-    with httpx.Client(timeout=20.0) as client:
+    with make_hub_client(timeout=20.0, base_url=hub) as client:
         openapi_ok = _check_openapi(client, hub, paths)
         if openapi_ok:
             return 0

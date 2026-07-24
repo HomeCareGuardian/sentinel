@@ -63,12 +63,17 @@ if [[ "${USE_TUNNEL}" == true ]]; then
 else
   echo "==> LAN probe: ${HUB_BASE_URL}/health"
   if ! curl -sf "${HUB_BASE_URL}/health" >/dev/null; then
-    echo "FAIL: not reachable — try --ssh-tunnel or join the Pi LAN" >&2
+    echo "FAIL: not reachable — join the Pi LAN (hub sshd disallows -L tunnels)" >&2
     exit 1
   fi
-  echo "==> LAN probe: ${HUB_BASE_URL}/api/devices"
-  curl -sf "${HUB_BASE_URL}/api/devices" | head -c 200
-  echo ""
+  # Hubs past setup mode refuse production routes on the LAN (hcg#640/#2333);
+  # the suites detect that and switch to the ssh-exec loopback transport.
+  gate_probe="$(curl -s --max-time 10 "${HUB_BASE_URL}/api/status" || true)"
+  if echo "${gate_probe}" | grep -q production_lan_refused; then
+    echo "==> LAN gate enforced — suites will use ssh-exec loopback via ${PI_USER}@${PI_HOST}"
+  else
+    echo "==> LAN gate not enforced (setup mode) — direct HTTP"
+  fi
 fi
 
 TARGETS_FILE="${SENTINEL_ROOT}/config/targets.local.env"

@@ -11,7 +11,8 @@ from suites.core.hub_catalog import load_catalog_entries
 
 pytestmark = [pytest.mark.sentinel_e2e, pytest.mark.api_catalog]
 
-FAIL_STATUSES = frozenset({405, 502, 504})
+# 500 is always a hub bug — a regression gate that tolerates it is not a gate.
+FAIL_STATUSES = frozenset({405, 500, 502, 504})
 
 
 def _catalog_params():
@@ -66,8 +67,9 @@ def test_device_detail_endpoints(hub_client: httpx.Client):
     for suffix in ("", "/config", "/detail", "/rooms"):
         path = f"/api/devices/{device_id}{suffix}"
         r = hub_client.get(path)
-        assert r.status_code not in FAIL_STATUSES
-        assert r.status_code in (200, 401, 403, 404, 500, 503), f"{path} -> {r.status_code}"
+        # /config currently 500s on live hubs — hcg#2506. 500 must FAIL here.
+        assert r.status_code not in FAIL_STATUSES, f"{path} -> {r.status_code} {r.text[:200]}"
+        assert r.status_code in (200, 401, 403, 404, 503), f"{path} -> {r.status_code}"
 
 
 def test_state_by_entity_id(hub_client: httpx.Client):
@@ -89,5 +91,36 @@ def test_state_by_entity_id(hub_client: httpx.Client):
     if not entity_id:
         pytest.skip("no entities in /api/states")
     r = hub_client.get(f"/api/states/{entity_id}")
-    assert r.status_code not in FAIL_STATUSES
-    assert r.status_code in (200, 404, 500, 503)
+    assert r.status_code not in FAIL_STATUSES, f"{entity_id} -> {r.status_code}"
+    assert r.status_code in (200, 404, 503)
+
+
+def test_anomaly_detail_endpoint(hub_client: httpx.Client):
+    listed = hub_client.get("/api/anomalies")
+    assert listed.status_code == 200
+    rows = [r for r in listed.json() if isinstance(r, dict)]
+    if not rows:
+        pytest.skip("no anomalies on hub")
+    anomaly_id = rows[0].get("anomaly_id") or rows[0].get("id")
+    r = hub_client.get(f"/api/anomalies/{anomaly_id}")
+    assert r.status_code not in FAIL_STATUSES, f"/api/anomalies/{anomaly_id} -> {r.status_code}"
+    assert r.status_code in (200, 404)
+
+
+def test_entity_activity_endpoints(hub_client: httpx.Client):
+    """Per-entity dynamic GETs: activity, speed, update-frequency."""
+    listed = hub_client.get("/api/entities")
+    assert listed.status_code == 200
+    entities = listed.json().get("entities") or []
+    if not entities:
+        pytest.skip("no entities on hub")
+    entity_id = entities[0].get("entity_id") if isinstance(entities[0], dict) else entities[0]
+    for template in (
+        "/api/activity/{e}",
+        "/api/speed/{e}",
+        "/api/sensors/{e}/update-frequency",
+    ):
+        path = template.format(e=entity_id)
+        r = hub_client.get(path)
+        assert r.status_code not in FAIL_STATUSES, f"{path} -> {r.status_code} {r.text[:200]}"
+        assert r.status_code in (200, 400, 404, 422, 503), f"{path} -> {r.status_code}"

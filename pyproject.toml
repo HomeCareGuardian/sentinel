@@ -34,10 +34,14 @@ testpaths = ["suites/core"]
 python_files = ["test_*.py"]
 markers = [
     "sentinel_e2e: Live hub black-box journey",
+    "j0: Journey J0 — LAN-gate posture (hcg#640/#2333)",
     "j1: Journey J1 — hub health",
     "j2: Journey J2 — caregiver auth",
     "j3: Journey J3 — HA states via hub API",
     "j4: Journey J4 — anomaly lifecycle",
+    "j5: Journey J5 — rooms create/list/delete round trip",
+    "j6: Journey J6 — logbook note write path",
+    "j7: Journey J7 — JSON-body parse regression probes (hcg#2505)",
     "api_catalog: Full hub GET API catalog smoke",
 ]
 addopts = "-v --strict-markers --tb=short"

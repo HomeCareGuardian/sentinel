@@ -6,9 +6,14 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+from pathlib import Path
 
-import httpx
+import httpx  # noqa: F401 — status/type reference
 import yaml
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from lib.hub_transport import make_hub_client  # noqa: E402
 
 
 def main() -> int:
@@ -24,7 +29,7 @@ def main() -> int:
     )
     email = os.environ.get(manifest.get("users", {}).get("email_env", "E2E_USER_EMAIL"), "")
 
-    with httpx.Client(base_url=hub, timeout=20.0) as client:
+    with make_hub_client(timeout=20.0, base_url=hub) as client:
         health = client.get("/health")
         if health.status_code != 200:
             print(f"FAIL: /health {health.status_code}")

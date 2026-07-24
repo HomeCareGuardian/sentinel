@@ -1,11 +1,18 @@
-version: "1"
+version: "2"
 owners: platform-qa
 model: black-box
 description: |
   Journeys validate deployed targets via public HTTP/UI only.
   This repo does not build or run product stacks.
+  Hub journey ids J0-J7 map 1:1 to pytest markers j0-j7 in suites/core/.
 
 p0:
+  - id: J0
+    name: LAN-gate posture (hubs past setup refuse direct LAN production calls)
+    surfaces: [core]
+    target_env: HUB_BASE_URL
+    paths: [/api/status, /health, /api/discovery/pending-pair]
+    notes: Regression gate for hcg#640 / hcg#2333; loopback path must keep serving
   - id: J1
     name: Hub boots and reports healthy
     surfaces: [core, ios]
@@ -24,18 +31,33 @@ p0:
     name: Anomaly lifecycle
     surfaces: [core, ios]
     paths: [/api/anomalies, /api/anomalies/{id}/acknowledge]
-  - id: J5
+  - id: J7
+    name: JSON-body parse regression probes (side-effect free)
+    surfaces: [core, ios]
+    paths:
+      - /api/anomalies/{id}/acknowledge
+      - /api/anomalies/{id}/resolve
+      - /api/places/{id}/name
+      - /api/hub/runtime-settings
+    notes: Catches the hcg#2505 failure class (runtime-only body parse crashes)
+  - id: CATALOG
+    name: Full hub GET catalog smoke (no 500 tolerated)
+    surfaces: [core, ios]
+    paths: [contracts/hub_api_catalog.yaml]
+  - id: W1
     name: Marketing site usable
     surfaces: [website]
     target_env: WEBSITE_BASE_URL
     playwright_tags: ["@p0"]
 
 p1:
+  - id: J5
+    name: Rooms create/list/delete round trip (admin write path)
+    surfaces: [core]
+    paths: [/api/rooms, /api/rooms/{id}]
   - id: J6
-    name: Dashboard aggregate
-    paths: [/api/dashboard]
-  - id: J7
-    name: ML engine state
-    paths: [/api/ml/engine/state]
+    name: Logbook note write path
+    surfaces: [core, ios]
+    paths: [/api/logbook/notes, /api/logbook]
 
 quarantine: []

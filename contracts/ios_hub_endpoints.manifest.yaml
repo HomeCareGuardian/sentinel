@@ -1,0 +1,85 @@
+# Hub endpoints the iOS app calls, per HCGAPIEndpoints.swift (the app's single
+# API surface). Vendored so Sentinel needs no product checkout at run time.
+#
+# Regenerate after iOS API changes:
+#   grep -Eo '// *(GET|POST|PUT|DEL|DELETE|PATCH) +/[A-Za-z0-9/_{}.-]+' \
+#     iOS-App/HomeCareGuardian/Clients/HCGAPI/HCGAPIEndpoints.swift \
+#     | sed -E 's|// *||; s/DEL /DELETE /; s/  +/ /' | sort -u
+#
+# Synced: 2026-07-22 (iOS-App main). Drift outside the enum cannot be seen here
+# (see iOS-App#748) — enforce "all hub calls go through HCGAPIEndpoint" instead.
+version: "1"
+endpoints:
+  - { method: DELETE, path: "/api/devices/{id}" }
+  - { method: DELETE, path: "/api/self/devices/{id}" }
+  - { method: DELETE, path: "/api/users/me/apns-token" }
+  - { method: GET, path: "/api/activity/{id}" }
+  - { method: GET, path: "/api/activity/day" }
+  - { method: GET, path: "/api/activity/month" }
+  - { method: GET, path: "/api/anomalies" }
+  - { method: GET, path: "/api/anomalies/{id}" }
+  - { method: GET, path: "/api/areas" }
+  - { method: GET, path: "/api/containers/status" }
+  - { method: GET, path: "/api/dashboard" }
+  - { method: GET, path: "/api/devices" }
+  - { method: GET, path: "/api/devices/{id}" }
+  - { method: GET, path: "/api/devices/debug" }
+  - { method: GET, path: "/api/discovery/available" }
+  - { method: GET, path: "/api/entities" }
+  - { method: GET, path: "/api/ha/issues" }
+  - { method: GET, path: "/api/insights/resident" }
+  - { method: GET, path: "/api/logbook" }
+  - { method: GET, path: "/api/ml/activity/summary" }
+  - { method: GET, path: "/api/ml/engine/state" }
+  - { method: GET, path: "/api/ml/entities" }
+  - { method: GET, path: "/api/ml/household-profile" }
+  - { method: GET, path: "/api/ml/human-events/status" }
+  - { method: GET, path: "/api/ml/insights/detailed" }
+  - { method: GET, path: "/api/ml/predictions" }
+  - { method: GET, path: "/api/ml/scheduler/status" }
+  - { method: GET, path: "/api/network/stats" }
+  - { method: GET, path: "/api/places" }
+  - { method: GET, path: "/api/places/{id}/map" }
+  - { method: GET, path: "/api/presence/history" }
+  - { method: GET, path: "/api/presence/snapshot" }
+  - { method: GET, path: "/api/relay/status" }
+  - { method: GET, path: "/api/resident/status" }
+  - { method: GET, path: "/api/routine-change" }
+  - { method: GET, path: "/api/self/devices" }
+  - { method: GET, path: "/api/self/devices/{id}/state" }
+  - { method: GET, path: "/api/self/shared-events" }
+  - { method: GET, path: "/api/states" }
+  - { method: GET, path: "/api/states/{id}" }
+  - { method: GET, path: "/api/status" }
+  - { method: GET, path: "/api/storage/stats" }
+  - { method: GET, path: "/api/system/telemetry" }
+  - { method: GET, path: "/api/system/telemetry/history" }
+  - { method: GET, path: "/api/users/me" }
+  - { method: GET, path: "/api/weather" }
+  - { method: GET, path: "/api/wifi/networks" }
+  - { method: GET, path: "/api/wifi/status" }
+  - { method: POST, path: "/api/anomalies/{id}/acknowledge" }
+  - { method: POST, path: "/api/anomalies/{id}/resolve" }
+  - { method: POST, path: "/api/areas" }
+  - { method: POST, path: "/api/devices/{id}/pair" }
+  - { method: POST, path: "/api/devices/discover" }
+  - { method: POST, path: "/api/devices/discover-network" }
+  - { method: POST, path: "/api/discovery/add" }
+  - { method: POST, path: "/api/discovery/ignore" }
+  - { method: POST, path: "/api/logbook/notes" }
+  - { method: POST, path: "/api/ml/entities/{id}/disable" }
+  - { method: POST, path: "/api/ml/entities/{id}/enable" }
+  - { method: POST, path: "/api/ml/inference/trigger" }
+  - { method: POST, path: "/api/ml/reset" }
+  - { method: POST, path: "/api/ml/training/trigger" }
+  - { method: POST, path: "/api/places/{id}/name" }
+  - { method: POST, path: "/api/self/collection-health" }
+  - { method: POST, path: "/api/self/devices/{id}/pause" }
+  - { method: POST, path: "/api/self/provision" }
+  - { method: POST, path: "/api/self/telemetry/healthkit" }
+  - { method: POST, path: "/api/self/telemetry/location" }
+  - { method: POST, path: "/api/self/telemetry/rr" }
+  - { method: POST, path: "/api/self/telemetry/sensors" }
+  - { method: POST, path: "/api/wifi/connect" }
+  - { method: PUT, path: "/api/devices/{id}" }
+  - { method: PUT, path: "/api/users/me/apns-token" }
