@@ -8,12 +8,10 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 COMPOSE_FILE="${ROOT}/docker-compose.virtual-hub.yml"
 ENV_FILE="${VCH_ENV_FILE:-${ROOT}/config/targets.virtual-hub.env}"
 
-# Avoid broken docker-credential-gcloud helpers during pulls of public images.
-if [[ -z "${DOCKER_CONFIG:-}" ]]; then
-  _vch_docker_cfg="$(mktemp -d "${TMPDIR:-/tmp}/vch-docker-cfg.XXXXXX")"
-  printf '%s\n' '{"auths":{}}' >"${_vch_docker_cfg}/config.json"
-  export DOCKER_CONFIG="${_vch_docker_cfg}"
-fi
+# Do not override DOCKER_CONFIG with an empty auth file — that drops
+# `docker login ghcr.io` / Podman credentials and breaks private pulls.
+# Public images use fully-qualified refs (docker.io/..., ghcr.io/...) so the
+# broken gcloud docker-credential helper is not required.
 
 resolve_compose() {
   local -a cmd=()
