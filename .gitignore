@@ -15,5 +15,11 @@ config/targets.*.env
 virtual_hub/ha-config/.storage/
 virtual_hub/ha-config/home-assistant_v2.db*
 virtual_hub/ha-config/*.log
+virtual_hub/ha-config/*.log.*
+virtual_hub/ha-config/.HA_VERSION
+virtual_hub/ha-config/.ha_run.lock
+virtual_hub/ha-config/blueprints/
+virtual_hub/ha-config/deps/
+config/targets.virtual-hub.env.bak
 .worktrees/
 .cursor/
