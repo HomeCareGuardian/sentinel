@@ -44,8 +44,8 @@ Authenticate to GHCR if the hub image is private (needs **package read** on
 `hcg-core`, not only `gh auth login`):
 
 ```bash
-echo "$GHCR_TOKEN" | podman login ghcr.io -u USERNAME --password-stdin
-# or: docker login ghcr.io
+echo "$GHCR_TOKEN" | docker login ghcr.io -u USERNAME --password-stdin
+# or: podman login ghcr.io (same store when using docker-compat)
 ```
 
 If pull returns `denied`, an org admin must grant your GitHub user read access

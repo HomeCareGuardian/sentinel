@@ -117,7 +117,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     # Started explicitly via `virtual-hub.sh up simulator` or `run-scenario`
-    # (no compose profiles — keeps Podman/podman-compose compatible).
+    # (no compose profiles — keeps docker compose + Podman docker-compat simple).
 
 networks:
   vch:
