@@ -37,9 +37,9 @@ HUB_HOST=hcg-hub-5fcf7e73cfe7a329 ./scripts/run-local.sh
 |------|---------|
 | `--host <id>` | Pi device id (e.g. `hcg-hub-5fcf7e73cfe7a329`) |
 | `--ssh-user <user>` | SSH user (default: `pi`) |
-| `--ssh-tunnel` | Forward `127.0.0.1:18080` → Pi `:8080` when mDNS/LAN fails |
+| `--ssh-tunnel` | Deprecated. `-L` forwarding is blocked on hardened hubs (`AllowTcpForwarding no`), so this now just sets `HUB_TRANSPORT=ssh-exec` (loopback transport) instead of opening a dead tunnel |
 
-Tunnel example:
+`--ssh-tunnel` no longer starts an `ssh -L` tunnel. On hubs past setup mode the sshd config refuses port forwarding, so the flag is routed to the `ssh-exec` loopback transport (curl on the Pi against `127.0.0.1:8080`). If you are on the Pi LAN you do not need the flag at all: the suites auto-detect the LAN gate and switch to `ssh-exec` themselves.
 
 ```bash
 ./scripts/run-local.sh --host hcg-hub-5fcf7e73cfe7a329 --ssh-tunnel
@@ -48,7 +48,7 @@ Tunnel example:
 ## What the script does
 
 1. SSH to the Pi and `curl` `http://127.0.0.1:8080/health`
-2. Unless `--ssh-tunnel`, probe `HUB_BASE_URL/health` and `/api/devices` on the LAN
+2. Unless `--ssh-tunnel` (which selects the `ssh-exec` loopback transport), probe `HUB_BASE_URL/health` on the LAN and detect the LAN gate
 3. Update `config/targets.local.env` with `HUB_HOST`, `HUB_BASE_URL`, `PI_HOST`, `HUB_DEVICE_ID`
 4. Verify `ADMIN_USERNAME` / `ADMIN_PASSWORD` are set (not placeholders)
 5. Run `./bin/sentinel --local pr-gate-hub` (contract, bootstrap, pytest J1–J4, hub HTTP iOS smoke)

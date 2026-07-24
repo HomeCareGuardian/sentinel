@@ -76,8 +76,13 @@ def main() -> int:
             ack_kwargs["headers"] = {"Authorization": "Bearer admin"}
 
         ack = client.post(f"/api/anomalies/{anomaly_id}/acknowledge", **ack_kwargs)
+        # KNOWN FAILURE (hcg#2505): the acknowledge handler 500s on a body-parse
+        # crash on the py3.14 runtime image. Soft-pass ONLY this specific 500 so
+        # bootstrap can proceed while the bug is open; every other non-2xx still
+        # WARNs below on its own. Remove this branch when hcg#2505 ships so a 500
+        # here fails loudly again.
         if ack.status_code == 500:
-            print("WARN: acknowledge 500 — body-parse crash on hub (hcg#2505)", file=sys.stderr)
+            print("WARN: acknowledge 500, body-parse crash on hub (hcg#2505)", file=sys.stderr)
         elif ack.status_code not in (200, 201):
             print(f"WARN: acknowledge {ack.status_code} (check ADMIN_* credentials)", file=sys.stderr)
         else:

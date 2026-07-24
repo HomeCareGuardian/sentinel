@@ -48,18 +48,14 @@ if ! ssh -o BatchMode=yes -o ConnectTimeout=15 "${PI_USER}@${PI_HOST}" \
   exit 1
 fi
 
-TUNNEL_PID=""
-cleanup() {
-  [[ -n "${TUNNEL_PID}" ]] && kill "${TUNNEL_PID}" 2>/dev/null || true
-}
-trap cleanup EXIT
-
 if [[ "${USE_TUNNEL}" == true ]]; then
-  LOCAL_PORT="${E2E_LOCAL_PORT:-18080}"
-  HUB_BASE_URL="http://127.0.0.1:${LOCAL_PORT}"
-  ssh -N -o ExitOnForwardFailure=yes -L "${LOCAL_PORT}:127.0.0.1:8080" "${PI_USER}@${PI_HOST}" &
-  TUNNEL_PID=$!
-  sleep 2
+  # -L port-forwarding is dead on hardened hubs (sshd AllowTcpForwarding no),
+  # so an ssh -L tunnel would just fail. Route through the ssh-exec loopback
+  # transport instead of pretending to open a tunnel.
+  echo "==> --ssh-tunnel: -L forwarding is unsupported on hardened hubs;" >&2
+  echo "    routing through the ssh-exec loopback transport" >&2
+  echo "    (HUB_TRANSPORT=ssh-exec via ${PI_USER}@${PI_HOST})." >&2
+  export HUB_TRANSPORT=ssh-exec
 else
   echo "==> LAN probe: ${HUB_BASE_URL}/health"
   if ! curl -sf "${HUB_BASE_URL}/health" >/dev/null; then

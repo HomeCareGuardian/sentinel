@@ -37,6 +37,25 @@ GATE_ERROR = "production_lan_refused"
 
 _CONTROL_DIR = os.path.join(tempfile.gettempdir(), "sentinel-ssh")
 
+# Headers that must not be forwarded (curl/host set these itself).
+_SKIP_HEADERS = frozenset({"host", "content-length", "connection", "accept-encoding"})
+
+
+def _cfg_escape(value: str) -> str:
+    """Escape a string for a curl config double-quoted value.
+
+    curl's config parser understands ``\\\\``, ``\\"``, ``\\t``, ``\\n`` and
+    ``\\r`` inside double quotes; escape those so headers and JSON bodies round
+    trip byte-for-byte.
+    """
+    return (
+        value.replace("\\", "\\\\")
+        .replace('"', '\\"')
+        .replace("\t", "\\t")
+        .replace("\r", "\\r")
+        .replace("\n", "\\n")
+    )
+
 
 def _ssh_base_args() -> list[str]:
     os.makedirs(_CONTROL_DIR, exist_ok=True)
@@ -74,23 +93,39 @@ class SSHExecTransport(httpx.BaseTransport):
 
     def handle_request(self, request: httpx.Request) -> httpx.Response:
         url = self._loopback + request.url.raw_path.decode("ascii")
-        curl = [
-            "curl", "-sS", "--http1.1", "-D", "-",
-            "--max-time", str(self._max_time),
-            "-X", request.method,
-            url,
+        # Secrets (Authorization, etc.) must never reach the remote argv, or
+        # they show up in `ps` on the Pi. Everything (url, method, headers and
+        # the request body) is fed to curl through a config file on stdin
+        # (`curl --config -`); the only argv is the bare `curl` invocation.
+        cfg_lines = [
+            f'url = "{_cfg_escape(url)}"',
+            f'request = "{_cfg_escape(request.method)}"',
+            "silent",
+            "show-error",
+            "http1.1",
+            f"max-time = {self._max_time}",
+            'dump-header = "-"',
         ]
         for name, value in request.headers.items():
-            if name.lower() in ("host", "content-length", "connection", "accept-encoding"):
+            if name.lower() in _SKIP_HEADERS:
                 continue
-            curl += ["-H", f"{name}: {value}"]
+            cfg_lines.append(f'header = "{_cfg_escape(name)}: {_cfg_escape(value)}"')
         body = request.read()
         if body:
-            curl += ["--data-binary", "@-"]
+            # Bodies in this harness are UTF-8 JSON; inline them in the config
+            # so they never touch argv either. `data-binary` sends the value
+            # verbatim (no newline stripping).
+            cfg_lines.append(f'data-binary = "{_cfg_escape(body.decode("utf-8"))}"')
+        config = "\n".join(cfg_lines) + "\n"
 
-        cmd = _ssh_base_args() + [self._dest, " ".join(shlex.quote(a) for a in curl)]
+        remote = " ".join(shlex.quote(a) for a in ("curl", "--config", "-"))
+        cmd = _ssh_base_args() + [self._dest, remote]
         proc = subprocess.run(
-            cmd, input=body, capture_output=True, timeout=self._max_time + 30, check=False
+            cmd,
+            input=config.encode("utf-8"),
+            capture_output=True,
+            timeout=self._max_time + 30,
+            check=False,
         )
         if proc.returncode != 0:
             raise httpx.TransportError(
@@ -150,13 +185,22 @@ def _lan_gate_active(base_url: str) -> bool:
         return False
 
 
+# Result of the last auto-probe, cached per process so pr-gate-hub (which makes
+# several clients) does not re-probe the LAN gate on every client creation.
+# An explicit HUB_TRANSPORT=direct|ssh-exec bypasses this cache entirely.
+_RESOLVED_AUTO_MODE: str | None = None
+
+
 def resolve_transport_mode(base_url: str | None = None) -> str:
     """Return the effective transport mode: ``direct`` or ``ssh-exec``."""
+    global _RESOLVED_AUTO_MODE
     mode = os.environ.get("HUB_TRANSPORT", "auto").strip().lower()
     if mode in ("direct", "ssh-exec"):
         return mode
     if mode != "auto":
         raise RuntimeError(f"HUB_TRANSPORT must be auto|direct|ssh-exec, got {mode!r}")
+    if _RESOLVED_AUTO_MODE is not None:
+        return _RESOLVED_AUTO_MODE
     base_url = base_url or os.environ.get("HUB_BASE_URL", DEFAULT_LOOPBACK_URL)
     if _lan_gate_active(base_url) and os.environ.get("PI_HOST", "").strip():
         print(
@@ -164,8 +208,10 @@ def resolve_transport_mode(base_url: str | None = None) -> str:
             f"transport via {_ssh_destination()}",
             file=sys.stderr,
         )
-        return "ssh-exec"
-    return "direct"
+        _RESOLVED_AUTO_MODE = "ssh-exec"
+    else:
+        _RESOLVED_AUTO_MODE = "direct"
+    return _RESOLVED_AUTO_MODE
 
 
 def make_hub_client(timeout: float = 30.0, base_url: str | None = None) -> httpx.Client:

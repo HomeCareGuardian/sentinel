@@ -49,7 +49,7 @@ def _norm(path: str) -> str:
     return re.sub(r"\{[^}]+\}", "{}", path.rstrip("/"))
 
 
-def _check_openapi(spec: dict, endpoints: list[dict]) -> list[str]:
+def _check_openapi(spec: dict, endpoints: list[dict]) -> tuple[list[str], int, int]:
     live: set[tuple[str, str]] = set()
     for path, methods in spec.get("paths", {}).items():
         for method in methods:
@@ -59,15 +59,18 @@ def _check_openapi(spec: dict, endpoints: list[dict]) -> list[str]:
         method = entry["method"].lower()
         if (method, _norm(entry["path"])) not in live:
             missing.append(f"{entry['method']} {entry['path']}")
-    return missing
+    # openapi mode verifies every endpoint (no live side effects), so nothing
+    # is skipped.
+    return missing, len(endpoints), 0
 
 
 ROUTER_404 = re.compile(r'^\{"detail"\s*:\s*"Not Found"\}$')
 
 
-def _check_probe(client, endpoints: list[dict]) -> list[str]:
+def _check_probe(client, endpoints: list[dict]) -> tuple[list[str], int, int]:
     probe_id = f"sentinel-drift-{uuid.uuid4()}"
     missing = []
+    checked = 0
     skipped = 0
     for entry in endpoints:
         method = entry["method"].upper()
@@ -80,6 +83,7 @@ def _check_probe(client, endpoints: list[dict]) -> list[str]:
         else:
             skipped += 1  # bare action POST / PUT / DELETE: not probe-safe live
             continue
+        checked += 1
         if r.status_code == 405 or (
             r.status_code == 404 and ROUTER_404.match(r.text.strip())
         ):
@@ -87,10 +91,10 @@ def _check_probe(client, endpoints: list[dict]) -> list[str]:
     if skipped:
         print(
             f"WARN: {skipped} non-probe-safe endpoints not checked in probe mode "
-            "(covered once /openapi.json serves again — hcg#2505)",
+            "(covered once /openapi.json serves again, hcg#2505)",
             file=sys.stderr,
         )
-    return missing
+    return missing, checked, skipped
 
 
 def main() -> int:
@@ -99,10 +103,11 @@ def main() -> int:
         print("FAIL: HUB_BASE_URL required", file=sys.stderr)
         return 1
     endpoints = _endpoints()
+    total = len(endpoints)
     with make_hub_client(timeout=20.0) as client:
         r = client.get("/openapi.json")
         if r.status_code == 200:
-            missing = _check_openapi(r.json(), endpoints)
+            missing, checked, skipped = _check_openapi(r.json(), endpoints)
             mode = "openapi"
         else:
             print(
@@ -110,7 +115,7 @@ def main() -> int:
                 "falling back to HTTP probe",
                 file=sys.stderr,
             )
-            missing = _check_probe(client, endpoints)
+            missing, checked, skipped = _check_probe(client, endpoints)
             mode = "probe"
     if missing:
         print(
@@ -120,7 +125,16 @@ def main() -> int:
         for m in missing:
             print(f"  - {m}", file=sys.stderr)
         return 1
-    print(f"OK: {len(endpoints)} iOS-called endpoints present on live hub [{mode}]")
+    # Be honest about coverage: in probe mode, bare action POST/PUT/DELETEs are
+    # skipped for live safety, so this is NOT full coverage while hcg#2505 keeps
+    # /openapi.json down.
+    line = f"OK: {checked}/{total} iOS-called endpoints present on live hub [{mode}]"
+    if skipped:
+        line += (
+            f"; {skipped} not probe-safe and left UNVERIFIED "
+            "(covered once /openapi.json serves again, hcg#2505)"
+        )
+    print(line)
     return 0
 
 

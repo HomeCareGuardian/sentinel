@@ -60,4 +60,8 @@ p1:
     surfaces: [core, ios]
     paths: [/api/logbook/notes, /api/logbook]
 
+# Known-red cases are quarantined in-code with pytest.mark.xfail(strict=True)
+# tied to the tracking issue (hcg#2505 body-parse probes, hcg#2506 device
+# /config), not via this key. strict=True makes an unexpected PASS fail loudly
+# so the marker is removed once the hub fix ships. Kept empty deliberately.
 quarantine: []
