@@ -1,14 +1,48 @@
 #!/usr/bin/env bash
 # Virtual Customer Hub helpers — compose lifecycle for the Sentinel digital twin.
+# Prefers Podman (podman-compose) when available; override with VCH_COMPOSE.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 COMPOSE_FILE="${ROOT}/docker-compose.virtual-hub.yml"
 ENV_FILE="${VCH_ENV_FILE:-${ROOT}/config/targets.virtual-hub.env}"
-COMPOSE=(docker compose -f "${COMPOSE_FILE}")
+
+# Ensure user-local podman-compose (pip --user) is visible.
+export PATH="${HOME}/Library/Python/3.14/bin:${HOME}/Library/Python/3.13/bin:${HOME}/.local/bin:${PATH}"
+
+# Avoid broken docker-credential-gcloud helpers during podman pulls of public images.
+if [[ -z "${DOCKER_CONFIG:-}" ]]; then
+  _vch_docker_cfg="$(mktemp -d "${TMPDIR:-/tmp}/vch-docker-cfg.XXXXXX")"
+  printf '%s\n' '{"auths":{}}' >"${_vch_docker_cfg}/config.json"
+  export DOCKER_CONFIG="${_vch_docker_cfg}"
+fi
+
+resolve_compose() {
+  local -a cmd=()
+  if [[ -n "${VCH_COMPOSE:-}" ]]; then
+    # shellcheck disable=SC2206
+    cmd=(${VCH_COMPOSE})
+  elif command -v podman-compose >/dev/null 2>&1; then
+    cmd=(podman-compose)
+  elif command -v podman >/dev/null 2>&1 && podman compose version >/dev/null 2>&1; then
+    cmd=(podman compose)
+  elif command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
+    cmd=(docker compose)
+  else
+    echo "FAIL: need podman-compose, 'podman compose', or 'docker compose'" >&2
+    echo "  pip install --user podman-compose" >&2
+    exit 1
+  fi
+  COMPOSE=("${cmd[@]}" -f "${COMPOSE_FILE}")
+  if [[ -f "${ENV_FILE}" ]]; then
+    COMPOSE+=(--env-file "${ENV_FILE}")
+  fi
+  echo "Using compose: ${COMPOSE[*]}"
+}
+
+resolve_compose
 
 if [[ -f "${ENV_FILE}" ]]; then
-  COMPOSE+=(--env-file "${ENV_FILE}")
   set -a
   # shellcheck disable=SC1090
   source "${ENV_FILE}"
@@ -22,10 +56,12 @@ usage() {
   cat <<'EOF'
 Usage: virtual-hub.sh <command> [args]
 
+Uses podman-compose when available (set VCH_COMPOSE to override).
+
 Commands:
-  up [profiles]     Start postgres + HA + hcg-core (optional: simulator)
+  up [simulator]    Start postgres + HA + hcg-core (optional: day-simulator)
   down              Stop and remove containers (keeps volumes)
-  status            docker compose ps
+  status            compose ps
   wait-healthy      Wait until hub /health succeeds
   bootstrap-ha      Complete HA onboarding and write HA_TOKEN into env file
   deploy [tag]      Set HCG_IMAGE tag (default: latest), pull, recreate hub
@@ -42,27 +78,45 @@ EOF
 }
 
 cmd_up() {
-  local profiles=()
+  local with_sim=0
   if [[ "${1:-}" == "simulator" ]]; then
-    profiles+=(--profile simulator)
+    with_sim=1
   fi
-  "${COMPOSE[@]}" "${profiles[@]}" up -d postgres homeassistant
+  # Start HA side first so bootstrap can obtain HA_TOKEN before hub comes up.
+  "${COMPOSE[@]}" up -d postgres homeassistant
+  if [[ ! -f "${ENV_FILE}" ]]; then
+    cp "${ROOT}/config/targets.virtual-hub.env.example" "${ENV_FILE}"
+  fi
   python3 "${ROOT}/virtual_hub/bootstrap_ha.py" \
     --ha-url "${HA_BASE_URL}" \
     --env-file "${ENV_FILE}" \
     --write-token
-  # Re-source in case bootstrap wrote HA_TOKEN
-  if [[ -f "${ENV_FILE}" ]]; then
-    set -a
-    # shellcheck disable=SC1090
-    source "${ENV_FILE}"
-    set +a
+  set -a
+  # shellcheck disable=SC1090
+  source "${ENV_FILE}"
+  set +a
+  # Re-resolve so --env-file picks up HA_TOKEN for hcg-core.
+  resolve_compose
+  if ! podman image exists "${HCG_IMAGE:-ghcr.io/homecareguardian/hcg-core:latest}" 2>/dev/null \
+    && ! docker image inspect "${HCG_IMAGE:-ghcr.io/homecareguardian/hcg-core:latest}" >/dev/null 2>&1; then
+    echo "Pulling hub image ${HCG_IMAGE:-ghcr.io/homecareguardian/hcg-core:latest}..."
+    if ! podman pull "${HCG_IMAGE:-ghcr.io/homecareguardian/hcg-core:latest}"; then
+      echo "FAIL: cannot pull hub image (GHCR package read required)." >&2
+      echo "  podman login ghcr.io -u <user>" >&2
+      echo "  Ask an org admin to grant read on package hcg-core, then retry." >&2
+      echo "Postgres + Home Assistant are up; HA_TOKEN is written. Hub not started." >&2
+      return 1
+    fi
   fi
-  "${COMPOSE[@]}" "${profiles[@]}" up -d
+  if [[ "${with_sim}" -eq 1 ]]; then
+    "${COMPOSE[@]}" up -d postgres homeassistant hcg-core day-simulator
+  else
+    "${COMPOSE[@]}" up -d postgres homeassistant hcg-core
+  fi
 }
 
 cmd_down() {
-  "${COMPOSE[@]}" --profile simulator down
+  "${COMPOSE[@]}" down
 }
 
 cmd_status() {
@@ -82,6 +136,7 @@ cmd_wait_healthy() {
     fi
     if (( "$(date +%s)" - start >= timeout )); then
       echo "FAIL: hub not healthy within ${timeout}s" >&2
+      "${COMPOSE[@]}" ps >&2 || true
       return 1
     fi
     sleep 3
@@ -96,7 +151,6 @@ cmd_bootstrap_ha() {
 }
 
 cmd_pull() {
-  "${COMPOSE[@]}" pull postgres homeassistant hcg-core || true
   "${COMPOSE[@]}" pull postgres homeassistant hcg-core
 }
 
@@ -108,7 +162,6 @@ cmd_deploy() {
     cp "${ROOT}/config/targets.virtual-hub.env.example" "${ENV_FILE}"
   fi
   if grep -q '^HCG_IMAGE=' "${ENV_FILE}" 2>/dev/null; then
-    # portable in-place edit
     local tmp
     tmp="$(mktemp)"
     sed "s|^HCG_IMAGE=.*|HCG_IMAGE=${image}|" "${ENV_FILE}" >"${tmp}"
@@ -121,6 +174,7 @@ cmd_deploy() {
   # shellcheck disable=SC1090
   source "${ENV_FILE}"
   set +a
+  resolve_compose
   cmd_pull
   "${COMPOSE[@]}" up -d hcg-core
   cmd_wait_healthy
@@ -141,11 +195,18 @@ cmd_run_tests() {
 
 cmd_run_scenario() {
   local name="${1:?scenario name required}"
-  "${COMPOSE[@]}" --profile simulator run --rm \
+  if [[ -f "${ENV_FILE}" ]]; then
+    set -a
+    # shellcheck disable=SC1090
+    source "${ENV_FILE}"
+    set +a
+  fi
+  "${COMPOSE[@]}" run --rm \
     -e SCENARIO="${name}" \
     -e ACCELERATED=1 \
     -e LOOP_DAYS=0 \
     -e HA_TOKEN="${HA_TOKEN:-}" \
+    -e HA_BASE_URL=http://homeassistant:8123 \
     --entrypoint python \
     day-simulator \
     day_runner.py --once --scenario "${name}" --accelerated

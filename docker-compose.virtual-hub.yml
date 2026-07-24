@@ -8,7 +8,7 @@ name: sentinel-virtual-hub
 
 services:
   postgres:
-    image: ${POSTGRES_IMAGE:-postgres:15}
+    image: ${POSTGRES_IMAGE:-docker.io/library/postgres:15}
     container_name: vch-postgres
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-homeassistant}
@@ -116,8 +116,8 @@ services:
       homeassistant:
         condition: service_healthy
     restart: unless-stopped
-    profiles:
-      - simulator
+    # Started explicitly via `virtual-hub.sh up simulator` or `run-scenario`
+    # (no compose profiles — keeps Podman/podman-compose compatible).
 
 networks:
   vch:

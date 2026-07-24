@@ -40,12 +40,16 @@ HOME_ASSISTANT_VERSION=2026.6.4
 POSTGRES_IMAGE=postgres:15
 ```
 
-Authenticate to GHCR if the hub image is private:
+Authenticate to GHCR if the hub image is private (needs **package read** on
+`hcg-core`, not only `gh auth login`):
 
 ```bash
-echo "$GHCR_TOKEN" | docker login ghcr.io -u USERNAME --password-stdin
+echo "$GHCR_TOKEN" | podman login ghcr.io -u USERNAME --password-stdin
+# or: docker login ghcr.io
 ```
 
+If pull returns `denied`, an org admin must grant your GitHub user read access
+to the `hcg-core` container package.
 ## 4. Start the twin
 
 ```bash

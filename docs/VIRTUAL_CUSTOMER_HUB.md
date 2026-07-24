@@ -20,7 +20,10 @@ Image pins are intended to track **hcg multi-image OTA** (hub + HA + Postgres)
 as that work lands in the product repo. Until then, bump pins in
 `config/targets.virtual-hub.env` and run `./scripts/virtual-hub.sh pull` / `deploy`.
 
-## Quick start (local Docker)
+## Quick start (local Podman or Docker)
+
+Requires **Podman** (`podman-compose`: `pip install --user podman-compose`) or
+Docker Compose. The script auto-detects Podman first.
 
 ```bash
 cp config/targets.virtual-hub.env.example config/targets.virtual-hub.env
@@ -33,12 +36,13 @@ cp config/targets.virtual-hub.env.example config/targets.virtual-hub.env
 ./scripts/virtual-hub.sh run-tests
 ```
 
-Optional continuous simulator profile:
+Optional continuous simulator:
 
 ```bash
 ./scripts/virtual-hub.sh up simulator
 ```
 
+Override the compose frontend with `VCH_COMPOSE="docker compose"` if needed.
 ## How sensor inject works
 
 1. Simulator POSTs to HA `http://homeassistant:8123/api/states/{entity_id}`
