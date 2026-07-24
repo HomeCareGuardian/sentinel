@@ -1,0 +1,33 @@
+{
+  "name": "single_day_motion",
+  "description": "Synthetic daytime motion pulses (privacy-safe; not a real household trace).",
+  "accelerated_speed": 240,
+  "events": [
+    {"sensor": "M001", "value": "ON", "offset_seconds": 0},
+    {"sensor": "M001", "value": "OFF", "offset_seconds": 30},
+    {"sensor": "M002", "value": "ON", "offset_seconds": 120},
+    {"sensor": "M002", "value": "OFF", "offset_seconds": 150},
+    {"sensor": "D001", "value": "OPEN", "offset_seconds": 300},
+    {"sensor": "D001", "value": "CLOSE", "offset_seconds": 320},
+    {
+      "entity_id": "binary_sensor.vch_kitchen_motion",
+      "state": "on",
+      "offset_seconds": 600,
+      "attributes": {
+        "friendly_name": "VCH Kitchen Motion",
+        "device_class": "motion",
+        "source": "sentinel-vch"
+      }
+    },
+    {
+      "entity_id": "binary_sensor.vch_kitchen_motion",
+      "state": "off",
+      "offset_seconds": 630,
+      "attributes": {
+        "friendly_name": "VCH Kitchen Motion",
+        "device_class": "motion",
+        "source": "sentinel-vch"
+      }
+    }
+  ]
+}

@@ -11,3 +11,9 @@ node_modules/
 suites/website/playwright-report/
 suites/website/test-results/
 config/targets.*.env
+!config/targets.*.env.example
+virtual_hub/ha-config/.storage/
+virtual_hub/ha-config/home-assistant_v2.db*
+virtual_hub/ha-config/*.log
+.worktrees/
+.cursor/

@@ -1,0 +1,38 @@
+{
+  "version": "v0",
+  "description": "Schema / activity expectations for virtual hub functional suite. Alert goldens deferred.",
+  "hub_version_capture": true,
+  "endpoints": {
+    "GET /health": {
+      "status": 200,
+      "required_keys": ["status"],
+      "status_values_any_of": ["healthy", "ok", "running"]
+    },
+    "GET /api/health": {
+      "status": 200
+    },
+    "GET /api/status": {
+      "status": 200,
+      "required_any_keys": ["running", "status", "components"]
+    },
+    "GET /api/devices": {
+      "status": 200,
+      "required_keys": ["devices"],
+      "devices_type": "list"
+    },
+    "GET /api/states": {
+      "status": 200,
+      "after_scenario": {
+        "single_day_motion": {
+          "must_include_entity_substrings": ["vch_", "motion"]
+        },
+        "idle_home": {
+          "must_include_entity_ids": [
+            "binary_sensor.vch_kitchen_motion",
+            "binary_sensor.vch_front_door"
+          ]
+        }
+      }
+    }
+  }
+}

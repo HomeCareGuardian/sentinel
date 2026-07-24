@@ -18,6 +18,17 @@ Enable both on every PR/push:
 Repository variable: E2E_CI_LOCAL_ENABLED = true
 ```
 
+## Virtual hub smoke
+
+Workflow: [`.github/workflows/virtual-hub.yml`](../.github/workflows/virtual-hub.yml)
+
+| Secret | Purpose |
+|--------|---------|
+| `GHCR_READ_TOKEN` | Pull private `ghcr.io/homecareguardian/hcg-core` (optional if image is public) |
+
+Path-filtered on twin files; also `workflow_dispatch`. No daily GitHub schedule —
+use OCI cron for standing twin (see `docs/OCI_ALWAYS_FREE_RUNBOOK.md`).
+
 ## Required GitHub secrets
 
 ### GCP profile (`gcp`)
