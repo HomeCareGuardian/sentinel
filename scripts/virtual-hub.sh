@@ -8,6 +8,9 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 COMPOSE_FILE="${ROOT}/docker-compose.virtual-hub.yml"
 ENV_FILE="${VCH_ENV_FILE:-${ROOT}/config/targets.virtual-hub.env}"
 
+# Podman's `docker compose` delegates to podman-compose (often pip --user).
+export PATH="${HOME}/Library/Python/3.14/bin:${HOME}/Library/Python/3.13/bin:${HOME}/.local/bin:${PATH}"
+
 # Do not override DOCKER_CONFIG with an empty auth file — that drops
 # `docker login ghcr.io` / Podman credentials and breaks private pulls.
 # Public images use fully-qualified refs (docker.io/..., ghcr.io/...) so the
@@ -22,6 +25,9 @@ resolve_compose() {
     cmd=(docker compose)
   else
     echo "FAIL: need 'docker compose' (Docker Engine or Podman docker-compat)" >&2
+    echo "  On Podman: pip install --user podman-compose  (must be on PATH)" >&2
+    echo "  Checked PATH for: ${HOME}/Library/Python/*/bin and ~/.local/bin" >&2
+    docker compose version >&2 || true
     exit 1
   fi
   COMPOSE=("${cmd[@]}" -f "${COMPOSE_FILE}")
