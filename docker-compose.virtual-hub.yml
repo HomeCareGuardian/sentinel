@@ -1,0 +1,128 @@
+# Virtual Customer Hub (Digital Twin) — Sentinel-owned stack.
+# Pulls published product images; does not build hcg from source.
+#
+# Image pins align with hcg multi-image OTA (hub + HA + Postgres) as that lands.
+# Sensor inject: Home Assistant REST on the private network (no hub inject API).
+
+name: sentinel-virtual-hub
+
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:-docker.io/library/postgres:15}
+    container_name: vch-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-homeassistant}
+      POSTGRES_USER: ${POSTGRES_USER:-homeassistant}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vch_postgres_password}
+      TZ: ${TZ:-Europe/London}
+    volumes:
+      - vch_postgres_data:/var/lib/postgresql/data
+      - ./virtual_hub/postgres-init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - vch
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-homeassistant}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  homeassistant:
+    image: ${HOME_ASSISTANT_IMAGE:-ghcr.io/home-assistant/home-assistant:${HOME_ASSISTANT_VERSION:-2026.6.4}}
+    container_name: vch-homeassistant
+    environment:
+      TZ: ${TZ:-Europe/London}
+      RECORDER_DB_URL: postgresql://homeassistant:${POSTGRES_PASSWORD:-vch_postgres_password}@postgres:5432/${POSTGRES_DB:-homeassistant}
+    volumes:
+      - ./virtual_hub/ha-config:/config
+    # Twin-only: HA is not published publicly. Bind localhost for operator debug.
+    ports:
+      - "127.0.0.1:8123:8123"
+    networks:
+      - vch
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8123/"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+    restart: unless-stopped
+
+  hcg-core:
+    image: ${HCG_IMAGE:-ghcr.io/homecareguardian/hcg-core:latest}
+    container_name: vch-hcg-core
+    environment:
+      TZ: ${TZ:-Europe/London}
+      API_HOST: 0.0.0.0
+      API_PORT: ${HUB_PORT:-8080}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-vch_admin_change_me}
+      HA_HOST: homeassistant
+      HA_PORT: 8123
+      HA_SSL: "false"
+      HA_ACCESS_TOKEN: ${HA_TOKEN:-}
+      HA_DB_HOST: postgres
+      HA_DB_PORT: 5432
+      HA_DB_NAME: ${POSTGRES_DB:-homeassistant}
+      HA_DB_USER: ${HA_DB_USER:-hcg_readonly}
+      HA_DB_PASSWORD: ${HA_DB_PASSWORD:-vch_readonly_password}
+      HA_DB_SSL: "false"
+      POSTGRES_USER: ${POSTGRES_USER:-homeassistant}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vch_postgres_password}
+      HCG_DB_HOST: postgres
+      HCG_DB_PORT: 5432
+      HCG_DB_NAME: ${HCG_DB_NAME:-hcg_core}
+      HCG_DB_USER: ${HCG_DB_USER:-hcg_admin}
+      HCG_DB_PASSWORD: ${HCG_DB_PASSWORD:-vch_hcg_password}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports:
+      - "${HUB_PUBLISH_HOST:-127.0.0.1}:${HUB_PORT:-8080}:8080"
+    networks:
+      - vch
+    depends_on:
+      postgres:
+        condition: service_healthy
+      homeassistant:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 45s
+    restart: unless-stopped
+
+  day-simulator:
+    build:
+      context: ./virtual_hub/simulator
+      dockerfile: Dockerfile
+    image: sentinel-vch-simulator:local
+    container_name: vch-day-simulator
+    environment:
+      TZ: ${TZ:-Europe/London}
+      HA_BASE_URL: http://homeassistant:8123
+      HA_TOKEN: ${HA_TOKEN:-}
+      SCENARIO: ${VCH_SCENARIO:-idle_home}
+      VCH_SIM_MODE: ${VCH_SIM_MODE:-continuous}
+      VCH_SIM_REPEAT: ${VCH_SIM_REPEAT:-1}
+      VCH_ACCELERATED: ${VCH_ACCELERATED:-0}
+    volumes:
+      - ./virtual_hub/simulator/scenarios:/scenarios:ro
+    networks:
+      - vch
+    depends_on:
+      homeassistant:
+        condition: service_healthy
+    restart: unless-stopped
+    # Started explicitly via `virtual-hub.sh up simulator` or `run-scenario`
+    # (no compose profiles — keeps docker compose + Podman docker-compat simple).
+
+networks:
+  vch:
+    driver: bridge
+
+volumes:
+  vch_postgres_data:

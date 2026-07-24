@@ -44,8 +44,13 @@ journey J0.
 | ------- | -------- | ------ |
 | `--local` | Pi / LAN hub + local website | `config/targets.local.env` |
 | `--gcp` | Staging hub on GCE + staging site | `config/targets.gcp.env` |
+| virtual hub | Digital twin (compose + published images) | `config/targets.virtual-hub.env` |
 
 Optional `config/targets.env` overrides either profile.
+
+**Virtual customer hub (twin):** see [docs/VIRTUAL_CUSTOMER_HUB.md](docs/VIRTUAL_CUSTOMER_HUB.md).
+`./scripts/virtual-hub.sh up` pulls published `hcg-core` + HA + Postgres; the
+simulator injects via HA REST (no hcg code changes).
 
 ## Commands
 
@@ -70,6 +75,8 @@ Optional `config/targets.env` overrides either profile.
 | [docs/CI_SECRETS.md](docs/CI_SECRETS.md) | GitHub Actions secrets |
 | [docs/WEBSITE_P0.md](docs/WEBSITE_P0.md) | Playwright P0 scope |
 | [docs/HUB_DEPENDENCIES.md](docs/HUB_DEPENDENCIES.md) | Hub fixes (#6, #7) |
+| [docs/VIRTUAL_CUSTOMER_HUB.md](docs/VIRTUAL_CUSTOMER_HUB.md) | Digital twin / virtual hub |
+| [docs/OCI_ALWAYS_FREE_RUNBOOK.md](docs/OCI_ALWAYS_FREE_RUNBOOK.md) | OCI host for standing twin |
 | [infra/gcp/README.md](infra/gcp/README.md) | Staging VM |
 | [suites/ios/README.md](suites/ios/README.md) | iOS HTTP + XCUITest |
 

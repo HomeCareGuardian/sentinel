@@ -18,6 +18,21 @@ Enable both on every PR/push:
 Repository variable: E2E_CI_LOCAL_ENABLED = true
 ```
 
+## Virtual hub smoke
+
+Workflow: [`.github/workflows/virtual-hub.yml`](../.github/workflows/virtual-hub.yml)
+
+| Secret / variable | Purpose |
+|-------------------|---------|
+| `GHCR_READ_TOKEN` | **Required** for twin stack smoke — pull `ghcr.io/homecareguardian/hcg-core` |
+| `VCH_STACK_SMOKE_ENABLED` | Repository **variable** (`true`) — run stack job on PRs (default: unit-only) |
+
+Stack job sets `VCH_REQUIRE_SCENARIO=1` so functional tests **fail** if scenario
+entities are missing on `/api/states`. Local opt-out: `VCH_ALLOW_MISSING_SCENARIO=1`.
+
+Path-filtered on twin files; also `workflow_dispatch`. No daily GitHub schedule —
+use OCI cron for standing twin (see `docs/OCI_ALWAYS_FREE_RUNBOOK.md`).
+
 ## Required GitHub secrets
 
 ### GCP profile (`gcp`)

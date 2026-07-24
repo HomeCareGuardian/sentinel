@@ -1,0 +1,27 @@
+{
+  "name": "idle_home",
+  "description": "Quiet household — health stays healthy; devices/rooms stable.",
+  "accelerated_speed": 120,
+  "events": [
+    {
+      "entity_id": "binary_sensor.vch_kitchen_motion",
+      "state": "off",
+      "offset_seconds": 0,
+      "attributes": {
+        "friendly_name": "VCH Kitchen Motion",
+        "device_class": "motion",
+        "source": "sentinel-vch"
+      }
+    },
+    {
+      "entity_id": "binary_sensor.vch_front_door",
+      "state": "off",
+      "offset_seconds": 1,
+      "attributes": {
+        "friendly_name": "VCH Front Door",
+        "device_class": "door",
+        "source": "sentinel-vch"
+      }
+    }
+  ]
+}
